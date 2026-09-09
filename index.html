@@ -181,6 +181,19 @@ button.confirm-delete{background:#b42318!important;color:#fff!important;border-c
 
 </style>
 </head>
+ <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<script>
+  const SUPABASE_URL = 'https://lgbbwsexntgnweynprnt.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_SHwnSjppV052CsfpHeE7Gw_6Ip48gCS';
+
+  const supabaseClient = window.supabase.createClient(
+    SUPABASE_URL,
+    SUPABASE_KEY
+  );
+
+  console.log('Supabase connected:', supabaseClient);
+</script>
 <body>
 <section id="loginScreen" class="login-screen">
   <div class="login-card" autocomplete="off">
