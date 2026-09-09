@@ -181,26 +181,13 @@ button.confirm-delete{background:#b42318!important;color:#fff!important;border-c
 
 </style>
 </head>
- <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-<script>
-  const SUPABASE_URL = 'https://lgbbwsexntgnweynprnt.supabase.co';
-  const SUPABASE_KEY = 'sb_publishable_SHwnSjppV052CsfpHeE7Gw_6Ip48gCS';
-
-  const supabaseClient = window.supabase.createClient(
-    SUPABASE_URL,
-    SUPABASE_KEY
-  );
-
-  console.log('Supabase connected:', supabaseClient);
-</script>
 <body>
 <section id="loginScreen" class="login-screen">
   <div class="login-card" autocomplete="off">
     <div class="brand">WOW <span>BEAUTY</span></div>
     <h1 style="margin-top:18px">Store Opening Control V2.4</h1>
     <div class="sub">Sequential PIC task handoff + submission / return + comments / attachments.</div>
-    <label>Account</label><select id="loginUser" onchange="clearLoginPassword()"></select>
+    <label>Email</label><input id="loginEmail" type="email" placeholder="adminmy@wowcolour.com" autocomplete="username">
     <label>Password</label><input id="loginPw" type="password" value="" autocomplete="new-password">
     <button class="primary" style="width:100%;margin-top:20px" onclick="doLogin()">Login</button>
     
@@ -536,6 +523,12 @@ button.confirm-delete{background:#b42318!important;color:#fff!important;border-c
 <button id="deleteProjectModalBtn" class="secondary danger hidden" data-confirm="0" onclick="deleteCurrentProjectFromModal()">Delete Project</button>
 </div></div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const SUPABASE_URL='https://lgbbwsexntgnweynprnt.supabase.co';
+const SUPABASE_KEY='sb_publishable_SHwnSjppV052CsfpHeE7Gw_6Ip48gCS';
+const supabaseClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+</script>
 <script>
 const ALL_PERMS=['view_all_projects','view_all_tasks','edit_tasks','edit_workflow','approve','manage_users','manage_departments','manage_roles'];
 
@@ -612,30 +605,17 @@ function can(p){return currentUser && !!roleObj(currentUser.role)?.perms.include
 function nowStamp(){return new Date().toLocaleString('en-MY',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:false})}
 function clearLoginPassword(){
  const p=$('loginPw');
- if(p){
-   p.value='';
-   p.setAttribute('autocomplete','new-password');
- }
+ if(p)p.value='';
 }
-function syncDemoPassword(){ clearLoginPassword(); }
-function refreshLogin(){
- const sel=$('loginUser');
- if(!sel)return;
- const active=users.filter(u=>u.status==='Active');
- const current=sel.value;
- sel.innerHTML=active.map(u=>`<option value="${u.id}">${escapeHtml(u.name)} — ${escapeHtml(u.role)} / ${escapeHtml(u.dept)}</option>`).join('');
- if(current && active.some(u=>String(u.id)===String(current))) sel.value=current;
- clearLoginPassword();
-}
+function refreshLogin(){ clearLoginPassword(); }
 
-setTimeout(clearLoginPassword,0);
-window.addEventListener('pageshow',clearLoginPassword);
-
-function doLogin(){
- const u=users.find(x=>x.id==$('loginUser').value && x.password===$('loginPw').value && x.status==='Active');
- if(!u)return alert('Invalid login.');
- currentUser=u;$('loginScreen').classList.add('hidden');$('app').classList.remove('hidden');
- $('uname').textContent=u.name;$('urole').textContent=`${u.role} · ${u.dept}`;$('avatar').textContent=u.name.split(' ').map(x=>x[0]).slice(0,2).join('').toUpperCase();
+function applyLoggedInUser(u){
+ currentUser=u;
+ $('loginScreen').classList.add('hidden');
+ $('app').classList.remove('hidden');
+ $('uname').textContent=u.name;
+ $('urole').textContent=`${u.role} · ${u.dept}`;
+ $('avatar').textContent=u.name.split(' ').map(x=>x[0]).slice(0,2).join('').toUpperCase();
  const isSA=u.role==='Super Admin';
  $('adminNav').classList.toggle('hidden',!isSA);
  $('addTaskBtn').classList.toggle('hidden',!isSA);
@@ -643,7 +623,57 @@ function doLogin(){
  if($('addProjectBtn'))$('addProjectBtn').classList.toggle('hidden',!isSA);
  renderAll();
 }
-function logout(){currentUser=null;$('app').classList.add('hidden');$('loginScreen').classList.remove('hidden');refreshLogin()}
+
+async function doLogin(){
+ const email=$('loginEmail').value.trim();
+ const password=$('loginPw').value;
+ if(!email||!password)return alert('Please enter email and password.');
+
+ const btn=document.querySelector('#loginScreen .primary');
+ if(btn){btn.disabled=true;btn.textContent='Signing in...';}
+
+ try{
+   const {data,error}=await supabaseClient.auth.signInWithPassword({email,password});
+   if(error)throw error;
+
+   const {data:profile,error:profileError}=await supabaseClient
+     .from('Profile')
+     .select('id,name,email,department,role,status')
+     .eq('id',data.user.id)
+     .single();
+
+   if(profileError)throw profileError;
+   if(!profile || profile.status!=='Active'){
+     await supabaseClient.auth.signOut();
+     throw new Error('This account is inactive or has no active profile.');
+   }
+
+   const u={
+     id:profile.id,
+     name:profile.name,
+     email:profile.email || email,
+     dept:profile.department,
+     role:profile.role,
+     status:profile.status
+   };
+   applyLoggedInUser(u);
+ }catch(err){
+   console.error('Login error:',err);
+   alert('Login failed: '+(err?.message||'Unknown error'));
+   clearLoginPassword();
+ }finally{
+   if(btn){btn.disabled=false;btn.textContent='Login';}
+ }
+}
+
+async function logout(){
+ await supabaseClient.auth.signOut();
+ currentUser=null;
+ $('app').classList.add('hidden');
+ $('loginScreen').classList.remove('hidden');
+ clearLoginPassword();
+}
+
 function page(id,el){
  if(id==='stores' && !storeAccessAllowed())return alert('You do not have access to Store Information.');
  if(id==='payments' && !paymentAccessAllowed())return alert('You do not have access to Payment List.');
@@ -2319,7 +2349,7 @@ function deleteUser(id){
  refreshLogin();
 }
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
-refreshLogin();
+clearLoginPassword();
 </script>
 
 <div id="newStoreModal" class="modal hidden">
