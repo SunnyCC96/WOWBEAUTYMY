@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>WOW BEAUTY | Merchandise Management</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{--bg:#f4f7fb;--card:#fff;--ink:#15243a;--muted:#718095;--line:#e5edf5;--nav:#19283b;--pink:#e45b7b;--ok:#25a874;--warn:#d99425}
+*{box-sizing:border-box}body{margin:0;font-family:Inter,Segoe UI,Arial,sans-serif;background:var(--bg);color:var(--ink)}.hidden{display:none!important}
+.app{display:grid;grid-template-columns:240px 1fr;min-height:100vh}aside{background:var(--nav);color:#fff;padding:22px 14px;position:sticky;top:0;height:100vh}.logo{font-size:23px;font-weight:900;padding:8px 10px 23px}.logo small{display:block;font-size:10px;letter-spacing:1.8px;color:#aebdca;margin-top:5px}
+.nav a{display:flex;gap:10px;color:#c9d3dd;text-decoration:none;padding:11px 12px;border-radius:10px;margin:3px 0;font-size:13px;font-weight:650}.nav a:hover,.nav a.active{background:#263b51;color:#fff}
+main{min-width:0}header{height:68px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 25px;position:sticky;top:0;z-index:20}.portal{text-decoration:none;color:#bb4667;font-weight:800;font-size:12px}.who{font-size:12px;color:var(--muted);text-align:right}
+.content{padding:25px}h1{font-size:26px;margin:0 0 6px}.desc{color:var(--muted);font-size:13px;margin-bottom:22px}.notice{background:#fff8e8;border:1px solid #f0d89c;color:#805d17;border-radius:12px;padding:11px 14px;margin-bottom:20px;font-size:12px}
+.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}.card{background:#fff;border:1px solid var(--line);border-radius:15px;padding:17px;box-shadow:0 4px 14px rgba(24,47,72,.04)}.metric{font-size:27px;font-weight:850;margin-top:8px}.small{font-size:11px;color:var(--muted)}.panel{background:#fff;border:1px solid var(--line);border-radius:16px;padding:18px;margin-top:18px}
+table{width:100%;border-collapse:collapse}th,td{padding:11px 9px;border-bottom:1px solid #edf2f6;text-align:left;font-size:12px}th{color:#647589;font-size:11px}button{border:0;border-radius:9px;padding:8px 11px;font-weight:750;cursor:pointer}.primary{background:var(--pink);color:#fff}.secondary{background:#edf2f6;color:#42556a}
+.toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px}input,select{border:1px solid #dce5ee;border-radius:9px;padding:9px 10px;font-size:12px}.tag{display:inline-block;padding:4px 8px;border-radius:999px;background:#edf8f3;color:#22845d;font-size:10px;font-weight:800}
+.empty{padding:35px;text-align:center;color:#8897a8;border:1px dashed #d8e2eb;border-radius:13px}.login{min-height:100vh;display:grid;place-items:center;background:linear-gradient(135deg,#f8dce5,#fff)}.loginbox{width:min(430px,90vw);background:#fff;border-radius:22px;padding:30px;box-shadow:0 20px 60px rgba(85,42,58,.13)}.loginbox input{width:100%;margin:5px 0 10px;padding:12px}.loginbox .primary{width:100%;margin-top:8px;padding:12px}
+@media(max-width:950px){.app{grid-template-columns:76px 1fr}aside{padding:17px 7px}.logo{font-size:14px;padding-left:5px}.logo small{display:none}.nav a span.txt{display:none}.cards{grid-template-columns:repeat(2,1fr)}}
+</style></head>
+<body>
+<section id="loginScreen" class="login">
+ <form class="loginbox" onsubmit="event.preventDefault();doLogin()">
+  <div style="font-size:28px;font-weight:900">WOW BEAUTY</div><div style="color:#d45a79;font-weight:800;margin:4px 0 23px">Merchandise Management</div>
+  <div class="small">Use the same WOW Beauty internal account.</div>
+  <input id="loginEmail" type="email" placeholder="Email"><input id="loginPw" type="password" placeholder="Password">
+  <button class="primary">Login</button><div id="loginErr" style="color:#b63d5c;font-size:12px;margin-top:10px"></div>
+ </form>
+</section>
+<section id="app" class="app hidden">
+ <aside><div class="logo">WOW BEAUTY<small>MERCHANDISE MANAGEMENT</small></div>
+  <nav class="nav">
+   <a class="active" onclick="page('dashboard',this)">▦ <span class="txt">Dashboard</span></a>
+   <a onclick="page('products',this)">▤ <span class="txt">Product Master</span></a>
+   <a onclick="page('brands',this)">◆ <span class="txt">Brands & Suppliers</span></a>
+   <a onclick="page('listing',this)">＋ <span class="txt">New Product Listing</span></a>
+   <a onclick="page('orders',this)">▣ <span class="txt">Order Tracking</span></a>
+   <a onclick="page('allocation',this)">⌂ <span class="txt">Store Allocation</span></a>
+   <a onclick="page('tasks',this)">✓ <span class="txt">Merchandise Task</span></a>
+   <a onclick="page('documents',this)">▧ <span class="txt">Documents</span></a>
+   <a id="adminNav" class="hidden" onclick="page('admin',this)">⚙ <span class="txt">Admin Settings</span></a>
+  </nav>
+ </aside>
+ <main><header><a class="portal" href="../">← Management Portal</a><div class="who"><b id="uname"></b><br><span id="urole"></span></div></header>
+ <div class="content">
+  <section id="page-dashboard"><h1>Merchandise Dashboard</h1><div class="desc">Product, supplier, listing and order management overview.</div>
+   <div class="notice"><b>V1 Framework Test:</b> This Merchandise workspace is isolated from Store Opening. Business records in this preview use separate <code>wm_</code> localStorage keys only; no Store Opening <code>wb_</code> tables are written.</div>
+   <div class="cards"><div class="card"><div class="small">ACTIVE SKU</div><div class="metric" id="mSku">0</div></div><div class="card"><div class="small">BRANDS</div><div class="metric" id="mBrand">0</div></div><div class="card"><div class="small">PENDING LISTING</div><div class="metric">0</div></div><div class="card"><div class="small">OPEN ORDERS</div><div class="metric">0</div></div></div>
+   <div class="panel"><div class="toolbar"><div><b>Recent Products</b><div class="small">Independent Merchandise preview data</div></div><button class="primary" onclick="page('products',document.querySelectorAll('.nav a')[1])">Open Product Master</button></div><div id="recentProducts"></div></div>
+  </section>
+  <section id="page-products" class="hidden"><div class="toolbar"><div><h1>Product Master</h1><div class="desc">Basic V1 product registry for framework testing.</div></div><button class="primary" onclick="addProduct()">+ Add Product</button></div><div class="panel"><table><thead><tr><th>SKU</th><th>Product</th><th>Brand</th><th>Category</th><th>Status</th><th></th></tr></thead><tbody id="productRows"></tbody></table></div></section>
+  <section id="page-brands" class="hidden"><h1>Brands & Suppliers</h1><div class="desc">Brand onboarding, supplier profile and commercial terms.</div><div class="empty">Framework ready · module details will be designed next.</div></section>
+  <section id="page-listing" class="hidden"><h1>New Product Listing</h1><div class="desc">New SKU submission, information completion and listing status.</div><div class="empty">Framework ready · module details will be designed next.</div></section>
+  <section id="page-orders" class="hidden"><h1>Order Tracking</h1><div class="desc">PO, order status, ETA and delayed delivery tracking.</div><div class="empty">Framework ready · module details will be designed next.</div></section>
+  <section id="page-allocation" class="hidden"><h1>Store Allocation</h1><div class="desc">SKU allocation by store and launch batch.</div><div class="empty">Framework ready · module details will be designed next.</div></section>
+  <section id="page-tasks" class="hidden"><h1>Merchandise Task</h1><div class="desc">Department task workflow based on the Store Opening framework.</div><div class="empty">Framework ready · task logic will use independent WM data.</div></section>
+  <section id="page-documents" class="hidden"><h1>Documents</h1><div class="desc">Product / supplier / order supporting documents.</div><div class="empty">Framework ready · future Storage will use Merchandise-only buckets.</div></section>
+  <section id="page-admin" class="hidden"><h1>Admin Settings</h1><div class="desc">Super Admin only.</div><div class="panel"><b>Access & Defaults</b><p class="small">User accounts continue to come from the shared Supabase Profile. Merchandise-specific access settings can be added later without changing Store Opening settings.</p></div></section>
+ </div></main>
+</section>
+<script>
+const SUPABASE_URL="https://lgbbwsexntgnweynprnt.supabase.co",SUPABASE_KEY="sb_publishable_SHwnSjppV052CsfpHeE7Gw_6Ip48gCS";
+const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY),$=id=>document.getElementById(id);let currentUser=null;
+let products=JSON.parse(localStorage.getItem('wm_demo_products')||'[]');
+function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+async function profileFor(uid){const {data,error}=await sb.from('Profile').select('id,name,email,department,role,status').eq('id',uid).single();if(error)throw error;if(data.status!=='Active')throw new Error('This account is inactive.');return data}
+function enter(p){currentUser=p;$('loginScreen').classList.add('hidden');$('app').classList.remove('hidden');$('uname').textContent=p.name||p.email;$('urole').textContent=`${p.department||''} · ${p.role||''}`;$('adminNav').classList.toggle('hidden',p.role!=='Super Admin');render()}
+async function doLogin(){try{$('loginErr').textContent='';const {data,error}=await sb.auth.signInWithPassword({email:$('loginEmail').value.trim(),password:$('loginPw').value});if(error)throw error;enter(await profileFor(data.user.id));}catch(e){$('loginErr').textContent='Login failed: '+(e?.message||e)}}
+function page(id,el){document.querySelectorAll('[id^="page-"]').forEach(x=>x.classList.add('hidden'));$('page-'+id).classList.remove('hidden');document.querySelectorAll('.nav a').forEach(x=>x.classList.remove('active'));if(el)el.classList.add('active');if(id==='dashboard'||id==='products')render()}
+function render(){$('mSku').textContent=products.filter(x=>x.status==='Active').length;$('mBrand').textContent=new Set(products.map(x=>x.brand).filter(Boolean)).size;$('productRows').innerHTML=products.map((p,i)=>`<tr><td>${esc(p.sku)}</td><td>${esc(p.name)}</td><td>${esc(p.brand)}</td><td>${esc(p.category)}</td><td><span class="tag">${esc(p.status)}</span></td><td><button class="secondary" onclick="deleteProduct(${i})">Delete</button></td></tr>`).join('')||'<tr><td colspan="6" class="small">No products yet.</td></tr>';$('recentProducts').innerHTML=products.slice(-5).reverse().map(p=>`<div style="padding:9px 0;border-bottom:1px solid #edf2f6"><b>${esc(p.name)}</b> <span class="small">· ${esc(p.sku)} · ${esc(p.brand)}</span></div>`).join('')||'<div class="small">No preview records yet.</div>'}
+function addProduct(){const sku=prompt('SKU / Item Code');if(!sku)return;const name=prompt('Product Name');if(!name)return;const brand=prompt('Brand')||'';const category=prompt('Category')||'';products.push({sku,name,brand,category,status:'Active'});localStorage.setItem('wm_demo_products',JSON.stringify(products));render()}
+function deleteProduct(i){if(!confirm('Delete this preview product?'))return;products.splice(i,1);localStorage.setItem('wm_demo_products',JSON.stringify(products));render()}
+(async()=>{try{const {data:{session}}=await sb.auth.getSession();if(session?.user)enter(await profileFor(session.user.id));}catch(e){console.warn(e)}})();
+</script></body></html>
