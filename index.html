@@ -316,7 +316,240 @@ button.confirm-delete{background:#b42318!important;color:#fff!important;border-c
   #loginScreen .wb-tagline{letter-spacing:.22em}
 }
 
+
+/* ===== V7 Task / Workflow Prototype ===== */
+.proto-toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.proto-summary{display:grid;grid-template-columns:repeat(4,minmax(120px,1fr));gap:12px;margin:14px 0}
+.proto-stat{padding:14px 16px;border:1px solid #eadfe3;border-radius:14px;background:#fff}
+.proto-stat b{display:block;font-size:22px;margin-top:4px}
+.proto-dept{margin:16px 0 22px;border:1px solid #e3e7ed;border-radius:16px;overflow:hidden;background:#fff}
+.proto-dept-head{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:13px 16px;background:#edf8fc;border-bottom:1px solid #dceaf0}
+.proto-dept-head h3{margin:0;font-size:15px;letter-spacing:.02em}
+.proto-task-grid{display:grid;grid-template-columns:minmax(190px,1.6fr) minmax(110px,.8fr) 115px 115px 125px 110px 140px;align-items:center}
+.proto-task-grid>div{padding:11px 12px;border-bottom:1px solid #edf0f3;min-height:48px}
+.proto-task-head{background:#078ab7;color:white;font-size:11px;font-weight:800;text-transform:uppercase}
+.proto-task-row:last-child>div{border-bottom:0}
+.proto-progress{height:8px;background:#edf0f3;border-radius:99px;overflow:hidden;margin-top:6px}
+.proto-progress>span{display:block;height:100%;background:#55c78a}
+.proto-status{display:inline-flex;padding:5px 9px;border-radius:999px;font-size:11px;font-weight:750}
+.proto-status.notstarted{background:#f0f2f5;color:#737b88}
+.proto-status.inprogress{background:#fff2c9;color:#8b6500}
+.proto-status.submitted{background:#e7f2ff;color:#2567a8}
+.proto-status.completed{background:#e2f7ea;color:#227445}
+.proto-actions{display:flex;gap:6px;flex-wrap:wrap}
+.proto-actions button{padding:6px 9px;font-size:11px}
+.proto-detail{padding:12px 16px 16px;background:#fbfcfd;border-top:1px dashed #dfe4e9}
+.proto-history{margin-top:8px;display:grid;gap:7px}
+.proto-history-item{padding:9px 11px;border:1px solid #e5e9ee;border-radius:10px;background:#fff;font-size:12px}
+.proto-history-item .small{margin-top:4px}
+.proto-modal-grid{display:grid;gap:12px}
+.proto-modal-grid textarea{min-height:100px}
+@media(max-width:1100px){
+ .proto-task-grid{grid-template-columns:minmax(180px,1.5fr) 110px 110px 110px 120px}
+ .proto-owner,.proto-progress-col{display:none}
+}
+@media(max-width:720px){
+ .proto-summary{grid-template-columns:repeat(2,1fr)}
+ .proto-task-grid{display:block;padding:10px 12px;border-bottom:1px solid #edf0f3}
+ .proto-task-grid>div{border:0;min-height:auto;padding:4px 0}
+ .proto-task-head{display:none}
+ .proto-task-row{display:block}
+ .proto-owner,.proto-progress-col{display:block}
+}
+
+
+/* V7.2 workflow timing */
+.proto-task-grid.workflow-grid{
+  grid-template-columns:minmax(190px,1.5fr) minmax(110px,.75fr) 110px 135px 125px 105px 110px 130px;
+}
+.proto-delete{border-color:#efc9c9!important;color:#b94242!important;background:#fff!important}
+.proto-empty{padding:26px;border:1px dashed #d9e0e8;border-radius:14px;background:#fff;color:#748097;text-align:center}
+@media(max-width:1100px){
+  .proto-task-grid.workflow-grid{grid-template-columns:minmax(180px,1.5fr) 110px 125px 110px 130px}
+  .proto-task-grid.workflow-grid .proto-owner,
+  .proto-task-grid.workflow-grid .proto-progress-col,
+  .proto-task-grid.workflow-grid .proto-duration-col{display:none}
+}
+
+
+/* V7.3 clearer action modals */
+.modal{
+  position:fixed!important;
+  inset:0!important;
+  z-index:9999!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  padding:24px!important;
+  background:rgba(28,30,38,.46)!important;
+  backdrop-filter:blur(6px);
+}
+.modal.hidden{display:none!important}
+.modal .modal-card{
+  width:min(560px,calc(100vw - 36px))!important;
+  max-height:88vh;
+  overflow:auto;
+  background:#fff!important;
+  border:1px solid rgba(228,91,123,.18)!important;
+  border-radius:22px!important;
+  box-shadow:0 28px 90px rgba(32,22,27,.30)!important;
+  padding:26px!important;
+  position:relative;
+}
+.modal .modal-card::before{
+  content:"";
+  position:absolute;
+  left:0;right:0;top:0;
+  height:6px;
+  border-radius:22px 22px 0 0;
+  background:linear-gradient(90deg,#e45b7b,#f3a2b7);
+}
+.modal .modal-card h2{margin-top:4px}
+.modal .modal-card label{font-weight:700;color:#303746}
+.modal .modal-card input,
+.modal .modal-card textarea,
+.modal .modal-card select{
+  width:100%;
+  border:1px solid #dfe4ec;
+  border-radius:12px;
+  background:#fff;
+  padding:12px 13px;
+  font:inherit;
+  color:#1d2330;
+}
+.modal .modal-card textarea{resize:vertical;min-height:120px}
+.modal .modal-card input:focus,
+.modal .modal-card textarea:focus,
+.modal .modal-card select:focus{
+  outline:none;
+  border-color:#e45b7b;
+  box-shadow:0 0 0 4px rgba(228,91,123,.10);
+}
+.modal-action-note{
+  padding:11px 13px;
+  border-radius:12px;
+  background:#fff7f9;
+  border:1px solid #f5d9e0;
+  color:#68454f;
+  font-size:13px;
+  line-height:1.55;
+}
+.modal-actions-row{display:flex;justify-content:flex-end;gap:10px;margin-top:4px}
+
+
+/* V7.4 task edit + persistent comment thread */
+.proto-comment-box{display:flex;gap:8px;margin-top:12px;align-items:flex-start}
+.proto-comment-box textarea{
+  flex:1;min-height:76px;border:1px solid #dfe4ec;border-radius:12px;padding:10px 12px;font:inherit;resize:vertical;background:#fff
+}
+.proto-comment-box button{white-space:nowrap}
+.proto-comments{display:grid;gap:8px;margin-top:10px}
+.proto-comment-item{padding:10px 12px;border:1px solid #e6eaf0;border-radius:10px;background:#fff}
+.proto-comment-item b{font-size:12px}
+.proto-history-section-title{margin-top:14px;font-size:13px;font-weight:800;color:#4d5666}
+.proto-edit-history{display:grid;gap:7px;margin-top:8px}
+.proto-edit-item{padding:9px 11px;border:1px solid #eee4e7;border-radius:10px;background:#fff9fb;font-size:12px}
+
+
+/* V7.5 due time + context-safe task detail */
+.proto-task-grid{
+  grid-template-columns:minmax(180px,1.45fr) minmax(105px,.75fr) 105px 115px 115px 105px 105px 145px;
+}
+.proto-task-grid.workflow-grid{
+  grid-template-columns:minmax(180px,1.35fr) minmax(105px,.7fr) 105px 115px 115px 100px 105px 105px 135px;
+}
+.proto-due-running{font-weight:750;color:#a66a00}
+.proto-due-done{font-weight:700;color:#357250}
+@media(max-width:1180px){
+  .proto-task-grid{grid-template-columns:minmax(170px,1.5fr) 105px 110px 110px 105px 135px}
+  .proto-task-grid .proto-owner,.proto-task-grid .proto-progress-col{display:none}
+  .proto-task-grid.workflow-grid{grid-template-columns:minmax(170px,1.5fr) 105px 110px 110px 100px 105px 130px}
+  .proto-task-grid.workflow-grid .proto-owner,.proto-task-grid.workflow-grid .proto-progress-col{display:none}
+}
+
+
+/* V7.6 dashboard aligned with independent task workflow */
+.dashboard-titlebar{margin-bottom:16px}
+.dashboard-quick-actions{display:flex;gap:8px;flex-wrap:wrap}
+.dashboard-stats{grid-template-columns:repeat(6,minmax(0,1fr))}
+.dashboard-stat-note{font-size:11px;color:#9099a8;margin-top:5px;line-height:1.3}
+.dashboard-risk-stat .v{color:#bd4545}
+.dashboard-project-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+.dashboard-project-card{
+  cursor:pointer;
+  border:1px solid #e6e9ef;
+  border-radius:16px;
+  background:#fff;
+  padding:16px;
+  transition:.16s ease;
+}
+.dashboard-project-card:hover{transform:translateY(-2px);box-shadow:0 12px 28px rgba(31,36,48,.10);border-color:#edcbd4}
+.dashboard-project-meta{display:flex;gap:12px;flex-wrap:wrap;margin-top:10px;color:#717b8d;font-size:12px}
+.dashboard-project-counts{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-top:12px}
+.dashboard-mini-kpi{background:#f7f8fb;border-radius:10px;padding:8px;text-align:center}
+.dashboard-mini-kpi b{display:block;font-size:15px}.dashboard-mini-kpi span{font-size:10px;color:#858e9c}
+.dashboard-alert{
+  padding:12px 13px;border:1px solid #e7eaf0;border-radius:12px;background:#fff;margin-top:9px
+}
+.dashboard-alert.danger{border-color:#f0c8c8;background:#fff8f8}
+.dashboard-alert.warning{border-color:#efdcb8;background:#fffaf1}
+.dashboard-alert.info{border-color:#dce4ef;background:#f9fbfe}
+.dashboard-alert-title{display:flex;justify-content:space-between;gap:12px;align-items:center}
+.dashboard-alert-meta{font-size:12px;color:#777f8e;margin-top:5px}
+.dashboard-action-item{
+  padding:12px 13px;border:1px solid #e7eaf0;border-radius:12px;background:#fff;margin-top:9px
+}
+.dashboard-action-main{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.dashboard-action-item .small{line-height:1.5}
+.dashboard-action-buttons{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}
+.dashboard-legend{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.dash-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px}
+.dash-ok{background:#49a66d}.dash-warn{background:#d8a23c}.dash-bad{background:#c95454}
+.dashboard-bottom-grid{align-items:start}
+@media(max-width:1250px){
+ .dashboard-stats{grid-template-columns:repeat(3,minmax(0,1fr))}
+ .dashboard-project-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:760px){
+ .dashboard-stats,.dashboard-project-grid{grid-template-columns:1fr}
+ .dashboard-quick-actions{width:100%}
+}
+
+
+.dashboard-project-card .proto-delete{padding:6px 9px;font-size:11px}
+
+
+.dashboard-project-controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.dashboard-project-card .proto-delete{
+  display:inline-flex!important;
+  visibility:visible!important;
+  opacity:1!important;
+}
+
+
+.dashboard-review-preview{
+  margin-top:10px;padding:10px 12px;border:1px solid #eadfe3;border-radius:10px;background:#fff9fb;line-height:1.5
+}
+#managementConfirmationPanel{border-top:4px solid #e45b7b}
+#dashboardProjectTopControls{display:inline-flex}
+.dashboard-project-card .proto-delete{display:inline-flex!important}
+
+
+.attachment-preview-card{width:min(820px,calc(100vw - 36px))!important}
+.attachment-preview-body{
+  min-height:260px;max-height:68vh;overflow:auto;border:1px solid #e4e8ef;border-radius:14px;background:#f7f8fb;
+  display:flex;align-items:center;justify-content:center;padding:14px
+}
+.attachment-preview-body img{max-width:100%;max-height:62vh;object-fit:contain;border-radius:8px}
+.attachment-preview-body iframe{width:100%;height:62vh;border:0;border-radius:8px;background:#fff}
+.proto-attachment-list{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}
+.proto-attachment-chip{
+  border:1px solid #e1d7db;background:#fff;border-radius:9px;padding:6px 9px;font-size:12px;cursor:pointer;color:#7e3d50
+}
+.proto-attachment-chip:hover{background:#fff5f8;border-color:#e9b7c5}
+
 </style>
+<!-- WOW_BEAUTY_GITHUB_RELEASE_V8_0: integrated production modules + new Dashboard/My Task/Workflow -->
 </head>
 <body>
 <section id="loginScreen" class="login-screen">
@@ -409,9 +642,10 @@ button.confirm-delete{background:#b42318!important;color:#fff!important;border-c
     <a class="active" onclick="page('dashboard',this)">⌂ Dashboard</a>
     <a id="storeInfoNav" class="hidden" onclick="page('stores',this)">▣ Store Information</a>
     <a id="paymentListNav" class="hidden" onclick="page('payments',this)">💳 Payment List</a>
-    <a onclick="page('tasks',this)">☑ Tasks</a>
+    <a onclick="page('tasks',this)">☑ My Task</a>
     <a onclick="page('workflow',this)">⇄ Workflow</a>
-    <a onclick="page('approvals',this)">☷ Pending Task</a>
+      <a onclick="page('approvals',this)">☷ Pending Task</a>
+    
     <a id="adminNav" onclick="page('admin',this)">⚙ Admin</a>
   </nav>
 </aside>
@@ -422,65 +656,105 @@ button.confirm-delete{background:#b42318!important;color:#fff!important;border-c
 </div>
 
 <section id="page-dashboard">
-  <h1>Store Opening Control Center</h1><div class="sub">Project overview, AI alerts and current workflow tasks.</div>
-  <div class="stats">
-    <div class="card stat"><div class="small">Active Projects</div><div class="v" id="statProjects">0</div></div>
-    <div class="card stat"><div class="small">At Risk</div><div class="v" id="statRisk">0</div></div>
-    <div class="card stat"><div class="small">Pending Task</div><div class="v" id="statPending">0</div></div>
-    <div class="card stat"><div class="small">Submitted</div><div class="v" id="statReturned">0</div></div>
-    <div class="card stat"><div class="small">Completed</div><div class="v" id="statApproved">0</div></div>
+  <div class="toolbar dashboard-titlebar">
+    <div>
+      <h1>Store Opening Control Center</h1>
+      <div class="sub">Live project progress and task actions based on My Task / Workflow.</div>
+    </div>
+    <div class="dashboard-quick-actions">
+      <button class="secondary" onclick="page('tasks',document.querySelector('.nav a[onclick*=tasks]'))">My Task</button>
+      <button class="secondary" onclick="page('workflow',document.querySelector('.nav a[onclick*=workflow]'))">Workflow</button>
+      <span id="dashboardProjectTopControls"></span>
+    </div>
+  </div>
+
+  <div class="stats dashboard-stats">
+    <div class="card stat"><div class="small">Active Projects</div><div class="v" id="statProjects">0</div><div class="dashboard-stat-note">Store opening projects</div></div>
+    <div class="card stat"><div class="small">Total Tasks</div><div class="v" id="statTotalTasks">0</div><div class="dashboard-stat-note">Across all projects</div></div>
+    <div class="card stat"><div class="small">In Progress</div><div class="v" id="statPending">0</div><div class="dashboard-stat-note">Currently being worked on</div></div>
+    <div class="card stat"><div class="small">Awaiting Confirmation</div><div class="v" id="statReturned">0</div><div class="dashboard-stat-note">Submitted to Management</div></div>
+    <div class="card stat"><div class="small">Completed</div><div class="v" id="statApproved">0</div><div class="dashboard-stat-note">Management confirmed</div></div>
+    <div class="card stat dashboard-risk-stat"><div class="small">Overdue</div><div class="v" id="statRisk">0</div><div class="dashboard-stat-note">Past target date</div></div>
   </div>
 
   <div class="card panel" style="margin-bottom:16px">
     <div class="toolbar">
-      <div><h2>Store Projects</h2><div class="small">Click a store to open project roadmap and task details.</div></div>
-      <button id="addProjectBtn" class="primary hidden" onclick="openProjectEditor()">+ New Project</button>
+      <div>
+        <h2>Store Projects</h2>
+        <div class="small">Progress is calculated from the live task status. Click a project to open its Workflow.</div>
+      </div>
+      <div class="dashboard-legend small">
+        <span><i class="dash-dot dash-ok"></i> On Track</span>
+        <span><i class="dash-dot dash-warn"></i> Attention</span>
+        <span><i class="dash-dot dash-bad"></i> At Risk</span>
+      </div>
     </div>
-    <div id="projectCards" class="project-grid"></div>
+    <div id="projectCards" class="project-grid dashboard-project-grid"></div>
   </div>
 
-  <div class="grid">
-    <div class="card panel"><h2>AI Alerts & Insights</h2><div id="aiAlerts"></div></div>
-    <div class="card panel"><h2>Pending Task Items</h2><div class="small">Current active workflow task for each project.</div><div id="dashboardPending"></div></div>
+  <div id="managementConfirmationPanel" class="card panel" style="margin-bottom:16px">
+    <div class="toolbar">
+      <div>
+        <h2>Management Confirmation</h2>
+        <div class="small" id="managementConfirmationSub">Submitted tasks waiting for Management review and completion confirmation.</div>
+      </div>
+      <span id="managementConfirmationCount" class="badge warn">0 Pending</span>
+    </div>
+    <div id="managementConfirmationList"></div>
+  </div>
+
+  <div class="grid dashboard-bottom-grid">
+    <div class="card panel">
+      <div class="toolbar">
+        <div><h2>Attention & Alerts</h2><div class="small">Generated from task status and target dates.</div></div>
+      </div>
+      <div id="aiAlerts"></div>
+    </div>
+
+    <div class="card panel">
+      <div class="toolbar">
+        <div><h2 id="dashboardActionTitle">My Department Action Items</h2><div class="small" id="dashboardActionSub">Tasks requiring your attention.</div></div>
+      </div>
+      <div id="dashboardPending"></div>
+    </div>
   </div>
 </section>
 
 <section id="page-tasks" class="hidden">
   <div class="toolbar">
-    <div><h1>Task Library</h1><div class="sub">System default tasks are configured by Super Admin. Tasks flow sequentially to the fixed PIC.</div></div>
-    <button id="addTaskBtn" class="primary hidden" onclick="openTask()">+ Add Default Task</button>
+    <div>
+      <h1>My Tasks</h1>
+      <div class="sub">Your department tasks only. Start, submit updates, review history and add new tasks if permitted.</div>
+    </div>
+    <div class="proto-toolbar">
+      <select id="protoTaskProject" onchange="renderProtoTasks()"></select>
+      <button id="addTaskBtn" class="primary" onclick="protoAddTask()">+ Add Task</button>
+    </div>
   </div>
-  <div class="card panel" style="margin-top:14px">
-  <div class="task-head">
-    <div>Sequence</div>
-    <div>Task</div>
-    <div>Department</div>
-    <div>PIC</div>
-    <div>Status</div>
-    <div>Action</div>
-  </div>
-  <div id="taskRows"></div>
-</div>
-  <div id="taskInfoPanel" class="card panel hidden" style="margin-top:14px"></div>
+  <div id="protoTaskSummary" class="proto-summary"></div>
+  <div id="protoTaskDepartments"></div>
 </section>
 
 <section id="page-workflow" class="hidden">
   <div class="toolbar">
-    <div><h1>Workflow Roadmap</h1><div class="sub">Roadmap shows task-to-task status. Click any task point to view its full detail.</div></div>
-    <button id="addWorkflowBtn" class="primary hidden" onclick="openWorkflow()">+ Add Workflow Task</button>
-  </div>
-  <div class="card panel" style="margin-top:14px">
-    <div class="toolbar"><div><h2 id="roadmapProjectTitle">1 Utama Roadmap</h2><div class="small">Status is color-coded by task state.</div></div>
-      <select id="roadmapProjectSelect" style="width:220px" onchange="renderWorkflowRoadmap()"></select>
+    <div>
+      <h1>Workflow Summary</h1>
+      <div class="sub">All departments overview. Everyone can review task status and submission history.</div>
     </div>
-    <div id="workflowRoadmap" class="roadmap"></div>
-    <div id="workflowTaskDetail" class="task-detail"><div class="small">Select a task point above to view details.</div></div>
+    <select id="protoWorkflowProject" onchange="renderProtoWorkflow()"></select>
   </div>
+  <div id="protoWorkflowSummary" class="proto-summary"></div>
+  <div id="protoWorkflowDepartments"></div>
 </section>
 
 <section id="page-approvals" class="hidden">
-  <div class="toolbar"><div><h1>Pending Task</h1><div class="sub">Current workflow tasks assigned to you. Submit forward or return to the previous PIC with comments and attachments.</div></div></div>
-  <div id="approvalActionList"></div>
+  <div class="toolbar">
+    <div>
+      <h1>My Tasks</h1>
+      <div class="sub">Start your assigned tasks, submit updates multiple times, and keep the full submission history.</div>
+    </div>
+  </div>
+  <div id="protoMyTasks"></div>
 </section>
 
 
@@ -815,11 +1089,10 @@ function applyLoggedInUser(u){
  $('uname').textContent=u.name;
  $('urole').textContent=`${u.role} · ${u.dept}`;
  $('avatar').textContent=u.name.split(' ').map(x=>x[0]).slice(0,2).join('').toUpperCase();
- const isSA=u.role==='Super Admin';
+ const isSA=dashboardNorm(u.role)==='super admin';
  $('adminNav').classList.toggle('hidden',!isSA);
  $('addTaskBtn').classList.toggle('hidden',!isSA);
  $('addWorkflowBtn').classList.toggle('hidden',!isSA);
- if($('addProjectBtn'))$('addProjectBtn').classList.toggle('hidden',!isSA);
  renderAll();
 }
 
@@ -917,8 +1190,12 @@ function page(id,el){
  target.classList.remove('hidden');
  document.querySelectorAll('.nav a').forEach(x=>x.classList.remove('active'));
  if(el)el.classList.add('active');
+ if(id==='dashboard')renderDashboard();
  if(id==='stores')renderStores();
  if(id==='payments')renderCentralPayments();
+ if(id==='tasks')renderProtoTasks();
+ if(id==='workflow')renderProtoWorkflow();
+ if(id==='approvals')renderApprovals();
 }
 function adminTab(id,el){document.querySelectorAll('[id^="admin-"]').forEach(x=>x.classList.add('hidden'));$('admin-'+id).classList.remove('hidden');document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));el.classList.add('active')}
 function openM(id){const el=$(id);if(!el)return;el.classList.remove('hidden');el.style.display='grid'}function closeM(id){const el=$(id);if(!el)return;el.classList.add('hidden');el.style.display=''}
@@ -983,7 +1260,7 @@ function paymentAccessAllowed(){
 }
 
 function renderPaymentAccessSettings(){
-  if(currentUser?.role!=='Super Admin')return;
+  if(!dashboardIsSuperAdmin())return;
   if($('paymentAccessDepartments')){
     $('paymentAccessDepartments').innerHTML=departments
       .map(d=>`<div class="store-access-item">
@@ -1007,7 +1284,7 @@ let storeAccessSettings = {
 };
 
 function renderStoreAccessSettings(){
-  if(currentUser?.role!=='Super Admin')return;
+  if(!dashboardIsSuperAdmin())return;
   if($('storeAccessDepartments')){
     $('storeAccessDepartments').innerHTML=departments
       .map(d=>`<div class="store-access-item">
@@ -1599,20 +1876,15 @@ normalizeSequentialWorkflow();
 
 function renderAll(){
  if($('paymentListNav'))$('paymentListNav').classList.toggle('hidden',!paymentAccessAllowed());
+ if($('storeInfoNav'))$('storeInfoNav').classList.toggle('hidden',!storeAccessAllowed());
  renderPaymentAccessSettings();
  renderStoreAccessSettings();
- renderStores();populateSelects();renderWorkflow();renderApprovals();renderTasks();renderAdmin();renderDashboard();if($('addProjectBtn'))$('addProjectBtn').classList.toggle('hidden',currentUser?.role!=='Super Admin');if($('addWorkflowBtn'))$('addWorkflowBtn').classList.toggle('hidden',currentUser?.role!=='Super Admin');refreshLogin()}
-function statusBadge(status){return `<span class="badge ${status==='Approved'?'ok':status==='Returned'?'bad':'warn'}">${status}</span>`}
-function eventBadge(type){return `<span class="badge ${type==='Approved'?'ok':type==='Returned'?'bad':type==='Submitted'?'purple':'plan'}">${type}</span>`}
-
-
-function parseDemoDate(s){
- if(!s)return null;
- const months={Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
- const m=String(s).match(/(\d{1,2})\s([A-Za-z]{3})\s(\d{4})\s(\d{2}):(\d{2})/);
- if(!m)return null;
- return new Date(+m[3],months[m[2]],+m[1],+m[4],+m[5]);
+ renderStores();
+ populateSelects();
+ renderAdmin();
+ renderDashboard();
  refreshLogin();
+ try{protoRenderAll()}catch(e){console.warn('Prototype render:',e)}
 }
 function consumeTime(from,to){
  const a=parseDemoDate(from),b=to?parseDemoDate(to):new Date();
@@ -2026,30 +2298,279 @@ function setRoadmapProject(projectId,workflowId){
  $('roadmapProjectSelect').value=projectId;renderWorkflowRoadmap();if(workflowId)showWorkflowTaskDetail(projectId,workflowId);
 }
 
+function dashboardNorm(v){return String(v||'').trim().toLowerCase();}
+function dashboardIsSuperAdmin(){
+ const role=dashboardNorm(currentUser?.role).replace(/[\s_-]+/g,'');
+ const email=dashboardNorm(currentUser?.email);
+ return role==='superadmin' || email==='adminmy@wowcolour.com';
+}
+function dashboardIsManagement(){
+ const dept=dashboardNorm(currentUser?.dept||currentUser?.department).replace(/[\s_-]+/g,'');
+ return dept==='management';
+}
+function dashboardTaskPct(t){
+ return t.status==='Completed'?100:t.status==='Submitted'?80:t.status==='In Progress'?40:0;
+}
+function dashboardTargetDate(t){
+ if(!t?.targetDate)return null;
+ const d=new Date(t.targetDate+'T23:59:59');
+ return isNaN(d)?null:d;
+}
+function dashboardDaysToTarget(t){
+ const d=dashboardTargetDate(t);
+ if(!d)return null;
+ return Math.ceil((d-new Date())/86400000);
+}
+function dashboardIsOverdue(t){
+ const days=dashboardDaysToTarget(t);
+ return t.status!=='Completed' && days!==null && days<0;
+}
+function dashboardProjectMetrics(p){
+ const tasks=protoAllTasks(p.id);
+ const total=tasks.length;
+ const completed=tasks.filter(t=>t.status==='Completed').length;
+ const submitted=tasks.filter(t=>t.status==='Submitted').length;
+ const inProgress=tasks.filter(t=>t.status==='In Progress').length;
+ const notStarted=tasks.filter(t=>t.status==='Not Started').length;
+ const overdue=tasks.filter(dashboardIsOverdue).length;
+ const dueSoon=tasks.filter(t=>{
+   const d=dashboardDaysToTarget(t);
+   return t.status!=='Completed' && d!==null && d>=0 && d<=3;
+ }).length;
+ const progress=total?Math.round(tasks.reduce((s,t)=>s+dashboardTaskPct(t),0)/total):0;
+ const status=overdue>0?'At Risk':(submitted>0||dueSoon>0?'Attention':'On Track');
+ return {tasks,total,completed,submitted,inProgress,notStarted,overdue,dueSoon,progress,status};
+}
+function dashboardOpenWorkflow(projectId){
+ page('workflow',document.querySelector('.nav a[onclick*=workflow]'));
+ const sel=$('protoWorkflowProject');
+ if(sel){sel.value=String(projectId);renderProtoWorkflow();}
+}
+function dashboardOpenMyTask(projectId){
+ page('tasks',document.querySelector('.nav a[onclick*=tasks]'));
+ const sel=$('protoTaskProject');
+ if(sel){sel.value=String(projectId);renderProtoTasks();}
+}
+function dashboardRenderProjectControls(){
+ const top=$('dashboardProjectTopControls');
+ if(top){
+   top.innerHTML=dashboardIsSuperAdmin()
+     ? `<button class="primary" onclick="dashboardAddProject()">+ Add New Project</button>`
+     : '';
+ }
+}
+function dashboardAddProject(){
+ if(!dashboardIsSuperAdmin())return alert('Only Super Admin can add projects.');
+ openProjectEditor();
+}
+function dashboardEditProject(projectId){
+ if(!dashboardIsSuperAdmin())return alert('Only Super Admin can edit projects.');
+ openProjectEditor(Number(projectId));
+}
+function dashboardDeleteProject(projectId){
+ if(!dashboardIsSuperAdmin())return alert('Only Super Admin can delete projects.');
+ const pid=Number(projectId);
+ const p=projects.find(x=>Number(x.id)===pid);
+ if(!p)return alert('Project not found.');
+
+ const ok=window.confirm(`Delete project "${p.name}"?\n\nThis will remove the project and its prototype task data.`);
+ if(!ok)return;
+
+ const idx=projects.findIndex(x=>Number(x.id)===pid);
+ if(idx<0)return alert('Project not found.');
+ projects.splice(idx,1);
+
+ try{
+   if(typeof protoProjectTasks!=='undefined'){
+     delete protoProjectTasks[pid];
+     delete protoProjectTasks[String(pid)];
+   }
+ }catch(e){console.warn('Task cleanup:',e)}
+
+ try{
+   if(typeof storeInfoData!=='undefined' && storeInfoData[pid]?.source==='Project'){
+     delete storeInfoData[pid];
+   }
+ }catch(e){console.warn('Store cleanup:',e)}
+
+ // Refresh selectors first, then dashboard. Do not call protoRenderAll here to avoid recursive dashboard rendering.
+ try{protoPopulateProjects()}catch(e){}
+ try{renderProtoTasks()}catch(e){}
+ try{renderProtoWorkflow()}catch(e){}
+ try{renderProtoMyTasks()}catch(e){}
+ renderDashboard();
+}
 function renderDashboard(){
- $('statProjects').textContent=projects.length;
- $('statRisk').textContent=projects.filter(p=>p.status==='At Risk').length;
- $('statPending').textContent=projects.filter(p=>currentPendingTask(p)).length;
- $('statReturned').textContent=projectMissions.filter(m=>m.status==='Submitted').length;
- $('statApproved').textContent=projectMissions.filter(m=>m.status==='Completed').length;
+ dashboardRenderProjectControls();
 
- $('projectCards').innerHTML=projects.map(p=>`<div class="project-card" onclick="openProject(${p.id})">
-   <div class="toolbar"><div><h3>${p.name}</h3><div class="small">${p.city} · Target ${p.opening}</div></div><span class="badge ${p.status==='At Risk'?'bad':p.status==='On Track'?'ok':'plan'}">${p.status}</span></div>
-   <div class="progress"><span style="width:${p.progress}%"></span></div>
-   <div class="toolbar"><span class="small">Progress</span><b>${p.progress}%</b></div>
-   <div class="small" style="margin-top:8px">Project Lead: ${p.lead}</div>
- </div>`).join('');
+ // Make sure the prototype task set exists before calculating dashboard data.
+ projects.forEach(p=>protoSeedProject(p.id));
 
- $('aiAlerts').innerHTML=projects.map(p=>`<div class="alert-item"><div class="toolbar"><b>${p.name}</b><span class="badge ${p.status==='At Risk'?'bad':p.status==='On Track'?'ok':'plan'}">${p.status}</span></div><div class="small" style="margin-top:5px">${escapeHtml(p.ai)}</div></div>`).join('');
+ const allTasks=projects.flatMap(p=>protoAllTasks(p.id));
+ const totalTasks=allTasks.length;
+ const inProgress=allTasks.filter(t=>t.status==='In Progress').length;
+ const submitted=allTasks.filter(t=>t.status==='Submitted').length;
+ const completed=allTasks.filter(t=>t.status==='Completed').length;
+ const overdue=allTasks.filter(dashboardIsOverdue).length;
 
- const pending=projects.map(p=>({project:p,task:currentPendingTask(p)})).filter(x=>x.task);
- $('dashboardPending').innerHTML=pending.length?pending.map(({project,task})=>{
-   const m=taskMission(project,task);
-   return `<div class="approval-card">
-     <div class="approval-head"><div><h3>${escapeHtml(project.name)} — ${escapeHtml(task.name)}</h3><div class="small">PIC: <b>${escapeHtml(task.pic||'-')}</b> · Department: <b>${escapeHtml(task.dept||'-')}</b></div></div>${statusPill('Pending')}</div>
-     <div class="small">Activated: ${m?.createdAt||'—'} · Sequence ${task.seq}</div>
+ if($('statProjects'))$('statProjects').textContent=projects.length;
+ if($('statTotalTasks'))$('statTotalTasks').textContent=totalTasks;
+ if($('statPending'))$('statPending').textContent=inProgress;
+ if($('statReturned'))$('statReturned').textContent=submitted;
+ if($('statApproved'))$('statApproved').textContent=completed;
+ if($('statRisk'))$('statRisk').textContent=overdue;
+
+ if($('projectCards'))$('projectCards').innerHTML=projects.map(p=>{
+   const m=dashboardProjectMetrics(p);
+   const badgeCls=m.status==='At Risk'?'bad':m.status==='On Track'?'ok':'plan';
+   return `<div class="dashboard-project-card" onclick="dashboardOpenWorkflow(${p.id})">
+     <div class="toolbar">
+       <div>
+         <h3>${escapeHtml(p.name)}</h3>
+         <div class="small">${escapeHtml(p.city||'—')} · Target Opening ${escapeHtml(p.opening||'—')}</div>
+       </div>
+       <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
+         <span class="badge ${badgeCls}">${m.status}</span>
+         ${dashboardIsSuperAdmin()?`
+           <button class="secondary" onclick="event.stopPropagation();dashboardEditProject(${p.id})">Edit</button>
+           
+         `:''}
+       </div>
+     </div>
+     <div class="progress" style="margin-top:13px"><span style="width:${m.progress}%"></span></div>
+     <div class="toolbar"><span class="small">Task Progress</span><b>${m.progress}%</b></div>
+     <div class="dashboard-project-counts">
+       <div class="dashboard-mini-kpi"><b>${m.inProgress}</b><span>In Progress</span></div>
+       <div class="dashboard-mini-kpi"><b>${m.submitted}</b><span>Submitted</span></div>
+       <div class="dashboard-mini-kpi"><b>${m.completed}</b><span>Completed</span></div>
+       <div class="dashboard-mini-kpi"><b>${m.overdue}</b><span>Overdue</span></div>
+     </div>
+     <div class="dashboard-project-meta"><span>Lead: ${escapeHtml(p.lead||'—')}</span><span>${m.completed}/${m.total} completed</span></div>
    </div>`;
- }).join(''):'<div class="small" style="padding-top:12px">No pending task items.</div>';
+ }).join('');
+
+ // Alerts: overdue first, then near due, then submitted waiting for Management.
+ const alerts=[];
+ projects.forEach(p=>{
+   const m=dashboardProjectMetrics(p);
+   m.tasks.filter(dashboardIsOverdue).forEach(t=>{
+     const days=Math.abs(dashboardDaysToTarget(t));
+     alerts.push({level:'danger',rank:1,project:p,task:t,title:'Overdue Task',
+       text:`${t.dept} · ${t.name} is ${days} day${days===1?'':'s'} past target date.`});
+   });
+   m.tasks.filter(t=>{
+     const d=dashboardDaysToTarget(t);
+     return t.status!=='Completed' && d!==null && d>=0 && d<=3;
+   }).forEach(t=>{
+     const d=dashboardDaysToTarget(t);
+     alerts.push({level:'warning',rank:2,project:p,task:t,title:d===0?'Due Today':'Due Soon',
+       text:`${t.dept} · ${t.name} target is ${d===0?'today':`in ${d} day${d===1?'':'s'}`}.`});
+   });
+   m.tasks.filter(t=>t.status==='Submitted').forEach(t=>{
+     alerts.push({level:'info',rank:3,project:p,task:t,title:'Awaiting Management Confirmation',
+       text:`${t.dept} · ${t.name} has been submitted and is waiting for completion confirmation.`});
+   });
+ });
+ alerts.sort((a,b)=>a.rank-b.rank);
+ if($('aiAlerts'))$('aiAlerts').innerHTML=alerts.length?alerts.slice(0,8).map(a=>`
+   <div class="dashboard-alert ${a.level}">
+     <div class="dashboard-alert-title"><b>${a.title}</b><span class="small">${escapeHtml(a.project.name)}</span></div>
+     <div class="dashboard-alert-meta">${escapeHtml(a.text)}</div>
+     <div class="dashboard-action-buttons"><button class="secondary" onclick="dashboardOpenWorkflow(${a.project.id})">View Workflow</button></div>
+   </div>`).join(''):'<div class="proto-empty">No urgent task alerts. Current projects are on track.</div>';
+
+
+ // Dedicated Management Confirmation panel.
+ const isManagement=dashboardIsManagement();
+ const isSuper=dashboardIsSuperAdmin();
+ const submittedForConfirmation=allTasks.filter(t=>t.status==='Submitted');
+ const managementPanel=$('managementConfirmationPanel');
+
+ if(managementPanel){
+   managementPanel.classList.toggle('hidden',!(isManagement||isSuper));
+ }
+ if($('managementConfirmationCount')){
+   $('managementConfirmationCount').textContent=`${submittedForConfirmation.length} Pending`;
+ }
+ if($('managementConfirmationSub')){
+   $('managementConfirmationSub').textContent=isManagement
+     ? 'Review submitted information and history before confirming Completed.'
+     : 'Submitted tasks waiting for Management. Super Admin can monitor this queue.';
+ }
+ if($('managementConfirmationList')){
+   $('managementConfirmationList').innerHTML=submittedForConfirmation.length
+     ? submittedForConfirmation.map(t=>{
+         const p=protoProject(t.projectId);
+         const last=(t.submissions||[])[(t.submissions||[]).length-1];
+         return `<div class="dashboard-action-item">
+           <div class="dashboard-action-main">
+             <div>
+               <b>${escapeHtml(t.name)}</b>
+               <div class="small">${escapeHtml(p?.name||'Project')} · ${escapeHtml(t.dept)} · Owner: ${escapeHtml(t.owner||'—')}</div>
+             </div>
+             <span class="proto-status ${protoStatusClass(t.status)}">${t.status}</span>
+           </div>
+           <div class="small" style="margin-top:7px">
+             Start: ${escapeHtml(protoDateOnly(t.startTime))} · Target: ${escapeHtml(t.targetDate||'Not set')} · Due Time: ${escapeHtml(protoElapsedDueTime(t))}
+           </div>
+           ${last?`<div class="dashboard-review-preview">
+             <b>Latest Submission</b>
+             <div class="small">${escapeHtml(last.by||'—')} · ${escapeHtml(last.time||'—')}</div>
+             <div>${escapeHtml(last.comment||'No comment')}</div>
+             ${last.files?.length?protoAttachmentButtons(last.files):''}
+           </div>`:''}
+           <div class="dashboard-action-buttons">
+             ${isManagement?`<button class="primary" onclick="protoCompleteTask(${t.id})">Review & Complete</button>`:''}
+             <button class="secondary" onclick="dashboardOpenWorkflow(${t.projectId})">Open Workflow</button>
+           </div>
+         </div>`;
+       }).join('')
+     : '<div class="proto-empty">No submitted tasks waiting for Management confirmation.</div>';
+ }
+
+ // Action items are role/department-aware.
+ let actionTasks=[];
+ if(isManagement){
+   actionTasks=allTasks.filter(t=>t.dept==='Management' && t.status!=='Completed' && t.status!=='Submitted');
+   if($('dashboardActionTitle'))$('dashboardActionTitle').textContent='Management Action Items';
+   if($('dashboardActionSub'))$('dashboardActionSub').textContent='Management department tasks still in progress.';
+ }else if(isSuper){
+   actionTasks=allTasks.filter(t=>t.status!=='Completed' && t.status!=='Submitted');
+   if($('dashboardActionTitle'))$('dashboardActionTitle').textContent='Active Task Monitor';
+   if($('dashboardActionSub'))$('dashboardActionSub').textContent='Active tasks across all departments.';
+ }else{
+   const dept=currentUser?.dept||currentUser?.department||'';
+   actionTasks=allTasks.filter(t=>t.dept===dept && t.status!=='Completed');
+   if($('dashboardActionTitle'))$('dashboardActionTitle').textContent='My Department Action Items';
+   if($('dashboardActionSub'))$('dashboardActionSub').textContent=`Open tasks for ${dept||'your department'}.`;
+ }
+
+ actionTasks.sort((a,b)=>{
+   if(dashboardIsOverdue(a)!==dashboardIsOverdue(b))return dashboardIsOverdue(a)?-1:1;
+   const da=dashboardDaysToTarget(a), db=dashboardDaysToTarget(b);
+   if(da===null && db!==null)return 1;
+   if(da!==null && db===null)return -1;
+   return (da??9999)-(db??9999);
+ });
+
+ if($('dashboardPending'))$('dashboardPending').innerHTML=actionTasks.length?actionTasks.slice(0,8).map(t=>{
+   const p=protoProject(t.projectId);
+   const overdueFlag=dashboardIsOverdue(t);
+   const targetText=t.targetDate||'Not set';
+   return `<div class="dashboard-action-item">
+     <div class="dashboard-action-main">
+       <div><b>${escapeHtml(t.name)}</b><div class="small">${escapeHtml(p?.name||'Project')} · ${escapeHtml(t.dept)} · ${escapeHtml(t.owner||'—')}</div></div>
+       <span class="proto-status ${protoStatusClass(t.status)}">${t.status}</span>
+     </div>
+     <div class="small" style="margin-top:7px">Target: ${targetText} · Due Time: ${protoElapsedDueTime(t)}${overdueFlag?' · <b style="color:#bd4545">OVERDUE</b>':''}</div>
+     <div class="dashboard-action-buttons">
+       ${isManagement && t.status==='Submitted'?`<button class="primary" onclick="protoCompleteTask(${t.id})">Review & Complete</button>`:''}
+       ${isSuper && t.status==='Submitted'?`<button class="secondary" onclick="dashboardOpenWorkflow(${t.projectId})">Review Submission</button>`:''}
+       ${!isManagement && !isSuper?`<button class="secondary" onclick="dashboardOpenMyTask(${t.projectId})">Open My Task</button>`:''}
+       <button class="secondary" onclick="dashboardOpenWorkflow(${t.projectId})">Workflow</button>
+     </div>
+   </div>`;
+ }).join(''):'<div class="proto-empty">No action items right now.</div>';
 }
 function approvalCard(a,withActions){
  const w=workflowObj(a.workflowId)||{name:'Deleted workflow',pic:'-',approver:'-'};
@@ -2076,7 +2597,7 @@ function approvalCard(a,withActions){
 
 
 function openProjectEditor(id){
- if(currentUser?.role!=='Super Admin')return alert('Only Super Admin can add or edit projects.');
+ if(!dashboardIsSuperAdmin())return alert('Only Super Admin can add or edit projects.');
  const p=projects.find(x=>x.id===id);
  $('editProjectId').value=id||'';
  $('projectEditorTitle').textContent=p?'Edit Project':'New Project';
@@ -2104,7 +2625,7 @@ function deleteCurrentProjectFromModal(){
    if(btn){btn.textContent='No Project Selected';setTimeout(()=>{btn.textContent='Delete Project';},1200);}
    return;
  }
- if(currentUser?.role!=='Super Admin')return;
+ if(!dashboardIsSuperAdmin())return;
 
  if(!btn || btn.dataset.confirm!=='1'){
    if(btn){
@@ -2129,14 +2650,14 @@ function deleteCurrentProjectFromModal(){
 function updateProjectDeleteButton(projectId){
  const btn=$('deleteProjectModalBtn');
  if(!btn)return;
- const canDelete=currentUser?.role==='Super Admin' && Number(projectId)>0;
+ const canDelete=dashboardIsSuperAdmin() && Number(projectId)>0;
  btn.classList.toggle('hidden',!canDelete);
 }
 
 function deleteProject(id,confirmed=false){
  const btn=$('deleteProjectModalBtn');
  try{
-   if(currentUser?.role!=='Super Admin')throw new Error('Only Super Admin can delete projects.');
+   if(!dashboardIsSuperAdmin())throw new Error('Only Super Admin can delete projects.');
    const p=projects.find(x=>x.id===Number(id));
    if(!p)throw new Error('Project not found.');
    if(!confirmed){
@@ -2203,7 +2724,7 @@ function deleteProject(id,confirmed=false){
 }
 
 function saveProject(){
- if(currentUser?.role!=='Super Admin')return alert('Only Super Admin can add or edit projects.');
+ if(!dashboardIsSuperAdmin())return alert('Only Super Admin can add or edit projects.');
  const id=+$('editProjectId').value;
  const obj={id:id||Date.now(),name:$('projName').value.trim(),city:$('projCity').value.trim(),opening:$('projOpening').value.trim(),progress:Math.max(0,Math.min(100,+$('projProgress').value||0)),status:$('projStatus').value,lead:$('projLead').value,risk:$('projRisk').value.trim(),ai:$('projAI').value.trim()};
  if(!obj.name)return alert('Project name is required.');
@@ -2214,6 +2735,7 @@ function saveProject(){
    initializeProjectFirstMission(obj);
  }
  closeM('projectEditorModal');renderAll();
+ try{protoRenderAll()}catch(e){}
 }
 
 let currentProjectId=null;
@@ -2576,6 +3098,630 @@ clearLoginPassword();
     </div>
   </div>
 </div>
+
+
+
+
+
+
+<div id="protoAttachmentPreviewModal" class="modal hidden">
+  <div class="modal-card attachment-preview-card">
+    <div class="toolbar">
+      <div>
+        <h2 id="protoAttachmentPreviewTitle">Attachment Preview</h2>
+        <div class="small" id="protoAttachmentPreviewMeta"></div>
+      </div>
+      <button class="secondary" onclick="protoCloseAttachmentPreview()">Close</button>
+    </div>
+    <div id="protoAttachmentPreviewBody" class="attachment-preview-body"></div>
+  </div>
+</div>
+
+<div id="protoEditTaskModal" class="modal hidden">
+  <div class="modal-card">
+    <div class="toolbar">
+      <div>
+        <h2 id="protoEditTaskTitle">Edit Task</h2>
+        <div class="small">Changes will be recorded in Edit History.</div>
+      </div>
+      <button class="secondary" onclick="closeM('protoEditTaskModal')">Close</button>
+    </div>
+    <div class="proto-modal-grid">
+      <div>
+        <label>Task Name</label>
+        <input id="protoEditTaskName">
+      </div>
+      <div>
+        <label>Target Date</label>
+        <input id="protoEditTaskTarget" type="date">
+      </div>
+      <input id="protoEditTaskId" type="hidden">
+      <div class="modal-actions-row">
+        <button class="secondary" onclick="closeM('protoEditTaskModal')">Cancel</button>
+        <button class="primary" onclick="protoSaveTaskEdit()">Save Changes</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="protoCompleteModal" class="modal hidden">
+  <div class="modal-card">
+    <div class="toolbar">
+      <div>
+        <h2 id="protoCompleteTitle">Confirm Task Completion</h2>
+        <div class="small">Management confirmation is required before a submitted task becomes Completed.</div>
+      </div>
+      <button class="secondary" onclick="closeM('protoCompleteModal')">Close</button>
+    </div>
+    <div class="proto-modal-grid">
+      <div id="protoCompleteTaskInfo" class="modal-action-note"></div>
+      <div>
+        <label>Submitted History</label>
+        <div id="protoCompleteSubmissionHistory" class="proto-history" style="max-height:240px;overflow:auto"></div>
+      </div>
+      <div class="modal-action-note">
+        This action will change the task status from <b>Submitted</b> to <b>Completed</b>.
+        The confirmation will be recorded in Submission History.
+      </div>
+      <div>
+        <label>Completion Comment</label>
+        <textarea id="protoCompleteComment" placeholder="Optional confirmation note..."></textarea>
+      </div>
+      <input id="protoCompleteTaskId" type="hidden">
+      <div class="modal-actions-row">
+        <button class="secondary" onclick="closeM('protoCompleteModal')">Cancel</button>
+        <button class="primary" onclick="protoConfirmCompleteTask()">Confirm Completed</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="protoStartModal" class="modal hidden">
+  <div class="modal-card">
+    <div class="toolbar">
+      <div><h2 id="protoStartTitle">Start Task</h2><div class="small">Set the target date before starting this task.</div></div>
+      <button class="secondary" onclick="closeM('protoStartModal')">Close</button>
+    </div>
+    <div class="proto-modal-grid">
+      <div class="modal-action-note">Start time will be recorded automatically when you confirm. Target Date is required.</div>
+      <div>
+        <label>Target Date</label>
+        <input id="protoStartTargetDate" type="date">
+        <div class="small" style="margin-top:6px">Set the planned completion date for this task.</div>
+      </div>
+      <input id="protoStartTaskId" type="hidden">
+      <div class="modal-actions-row"><button class="secondary" onclick="closeM('protoStartModal')">Cancel</button><button class="primary" onclick="protoConfirmStartTask()">Start Task</button></div>
+    </div>
+  </div>
+</div>
+
+<div id="protoSubmitModal" class="modal hidden">
+  <div class="modal-card">
+    <div class="toolbar"><h2 id="protoSubmitTitle">Submit Task Update</h2><button class="secondary" onclick="closeM('protoSubmitModal')">Close</button></div>
+    <div class="proto-modal-grid">
+      <div class="modal-action-note">Each submission is kept in history. You can submit additional updates again later while the task remains Submitted.</div>
+      <div><label>Comment / Detail</label><textarea id="protoSubmitComment" placeholder="Enter progress, issue, update or submission detail..."></textarea></div>
+      <div><label>Attachment</label><input id="protoSubmitFile" type="file" multiple></div>
+      <input id="protoSubmitTaskId" type="hidden">
+      <div class="modal-actions-row"><button class="secondary" onclick="closeM('protoSubmitModal')">Cancel</button><button class="primary" onclick="protoSaveSubmission()">Submit Update</button></div>
+    </div>
+  </div>
+</div>
+
+<div id="protoTaskModal" class="modal hidden">
+  <div class="modal-card">
+    <div class="toolbar"><h2>Add Department Task</h2><button class="secondary" onclick="closeM('protoTaskModal')">Close</button></div>
+    <div class="proto-modal-grid">
+      <div><label>Task Name</label><input id="protoNewTaskName" placeholder="e.g. Mall marketing launch plan"></div>
+      <div><label>Department</label><select id="protoNewTaskDept"></select></div>
+      <div><label>PIC</label><select id="protoNewTaskPic"></select></div>
+      <button class="primary" onclick="protoSaveNewTask()">Add Task</button>
+    </div>
+  </div>
+</div>
+
+<script>
+
+/* ===== V7 independent department task prototype ===== */
+let protoTaskSeq=9000;
+let protoSubmissionSeq=1;
+const protoProjectTasks={};
+
+function protoCurrentProjectId(selId){
+ const el=$(selId);
+ return Number(el?.value || projects[0]?.id || 0);
+}
+function protoProject(pid){ return projects.find(p=>Number(p.id)===Number(pid)); }
+function protoActiveDepartments(){ return departments.filter(d=>d.status==='Active'); }
+
+function protoSeedProject(pid){
+ pid=Number(pid); if(!pid || protoProjectTasks[pid])return;
+ const p=protoProject(pid);
+ const lead=p?.lead || activeUsers()[0]?.name || 'Sunny';
+ const byDept={};
+ protoActiveDepartments().forEach(d=>{
+   const deptUsers=activeUsers().filter(u=>u.dept===d.name);
+   const pic=deptUsers[0]?.name || lead;
+   byDept[d.name]=[1,2,3,4,5].map((n,i)=>({
+     id:++protoTaskSeq,
+     projectId:pid,
+     dept:d.name,
+     name:`${d.name} Task ${n}`,
+     owner:pic,
+     priority:i===0?'High':i<3?'Medium':'Low',
+     targetDate:'',
+     status:'Not Started',
+     startTime:'',
+     completedTime:'',
+     submissions:[],
+     comments:[],
+     editHistory:[],
+     progress:0
+   }));
+ });
+ protoProjectTasks[pid]=byDept;
+}
+function protoAllTasks(pid){
+ protoSeedProject(pid);
+ return Object.values(protoProjectTasks[Number(pid)]||{}).flat();
+}
+function protoTaskById(id){
+ for(const pid of Object.keys(protoProjectTasks)){
+   for(const t of Object.values(protoProjectTasks[pid]).flat()) if(Number(t.id)===Number(id))return t;
+ }
+ return null;
+}
+function protoCanWork(t){
+ if(!currentUser)return false;
+ if(currentUser.role==='Super Admin')return true;
+ return currentUser.dept===t.dept;
+}
+function protoCanComplete(){
+ return dashboardIsManagement();
+}
+function protoCanAddTask(){
+ if(!currentUser)return false;
+ if(['Super Admin','Management','Project Admin'].includes(currentUser.role))return true;
+ return !!currentUser.dept;
+}
+function protoCanEdit(t){
+ if(!currentUser)return false;
+ if(currentUser.role==='Super Admin')return true;
+ return currentUser.dept===t.dept;
+}
+function protoCanDelete(t){
+ if(!currentUser)return false;
+ if(currentUser.role==='Super Admin')return true;
+ return currentUser.dept===t.dept;
+}
+function protoDateOnly(v){
+ if(!v)return '—';
+ const m=String(v).match(/^(\d{4})-(\d{2})-(\d{2})/);
+ if(m)return `${m[1]}-${m[2]}-${m[3]}`;
+ const d=new Date(v);
+ return isNaN(d)?v:d.toISOString().slice(0,10);
+}
+function protoDuration(t){
+ if(!t.startTime || !t.targetDate)return '—';
+ let start;
+ const isoTry=new Date(t.startTime);
+ if(!isNaN(isoTry)) start=isoTry;
+ else{
+   const m=String(t.startTime).match(/(\d{1,2})\s([A-Za-z]{3})\s(\d{4})\s(\d{2}):(\d{2})/);
+   const months={Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
+   if(m)start=new Date(+m[3],months[m[2]],+m[1],+m[4],+m[5]);
+ }
+ const target=new Date(t.targetDate+'T23:59:59');
+ if(!start || isNaN(start) || isNaN(target))return '—';
+ const days=Math.max(0,Math.ceil((target-start)/(1000*60*60*24)));
+ return `${days} day${days===1?'':'s'}`;
+}
+function protoElapsedDueTime(t){
+ if(!t.startTime)return '—';
+ let start=new Date(t.startTime);
+ if(isNaN(start)){
+   const m=String(t.startTime).match(/(\d{1,2})\s([A-Za-z]{3})\s(\d{4})\s(\d{2}):(\d{2})/);
+   const months={Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
+   if(m)start=new Date(+m[3],months[m[2]],+m[1],+m[4],+m[5]);
+ }
+ if(!start || isNaN(start))return '—';
+ let end=new Date();
+ if(t.status==='Completed' && t.completedTime){
+   const cd=new Date(t.completedTime);
+   if(!isNaN(cd))end=cd;
+ }
+ let mins=Math.max(0,Math.floor((end-start)/60000));
+ const days=Math.floor(mins/1440); mins%=1440;
+ const hrs=Math.floor(mins/60); const m=mins%60;
+ if(days>0)return `${days}d ${hrs}h`;
+ if(hrs>0)return `${hrs}h ${m}m`;
+ return `${m}m`;
+}
+function protoStatusClass(s){return String(s||'').toLowerCase().replace(/\s+/g,'');}
+function protoFormatStamp(v){return v||'—';}
+function protoPopulateProjects(){
+ ['protoTaskProject','protoWorkflowProject'].forEach(id=>{
+   const el=$(id); if(!el)return;
+   const old=el.value;
+   el.innerHTML=projects.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
+   if(old && projects.some(p=>String(p.id)===String(old)))el.value=old;
+ });
+}
+function protoSummaryHtml(tasks){
+ const count=s=>tasks.filter(t=>t.status===s).length;
+ return `
+ <div class="proto-stat"><span class="small">Total Tasks</span><b>${tasks.length}</b></div>
+ <div class="proto-stat"><span class="small">In Progress</span><b>${count('In Progress')}</b></div>
+ <div class="proto-stat"><span class="small">Submitted</span><b>${count('Submitted')}</b></div>
+ <div class="proto-stat"><span class="small">Completed</span><b>${count('Completed')}</b></div>`;
+}
+function protoTaskRow(t,showDept=false,context='my'){
+ const pct=t.status==='Completed'?100:t.status==='Submitted'?80:t.status==='In Progress'?40:0;
+ const canWork=protoCanWork(t);
+ const canComplete=protoCanComplete() && t.status==='Submitted';
+ const workflow=context==='workflow';
+ const gridClass=workflow?'proto-task-grid workflow-grid proto-task-row':'proto-task-grid proto-task-row';
+ const detailId=`protoHistory_${context}_${t.id}`;
+ const commentId=`protoComment_${context}_${t.id}`;
+ const due=protoElapsedDueTime(t);
+ return `<div class="${gridClass}">
+   <div><b>${t.name}</b>${showDept?`<div class="small">${t.dept}</div>`:''}</div>
+   <div class="proto-owner">${t.owner||'—'}</div>
+   <div><span class="proto-status ${protoStatusClass(t.status)}">${t.status}</span></div>
+   <div>${protoDateOnly(t.startTime)}</div>
+   <div>${t.targetDate||'—'}</div>
+   ${workflow?`<div class="proto-duration-col">${protoDuration(t)}</div>`:''}
+   <div class="${t.status==='Completed'?'proto-due-done':'proto-due-running'}">${due}</div>
+   <div class="proto-progress-col">${pct}%<div class="proto-progress"><span style="width:${pct}%"></span></div></div>
+   <div class="proto-actions">
+     ${!workflow && t.status==='Not Started' && canWork?`<button class="primary" onclick="protoStartTask(${t.id})">Start</button>`:''}
+     ${!workflow && t.status!=='Not Started' && t.status!=='Completed' && canWork?`<button class="secondary" onclick="protoOpenSubmit(${t.id})">Submit</button>`:''}
+     ${!workflow && canComplete?`<button class="primary" onclick="protoCompleteTask(${t.id})">Complete</button>`:''}
+     ${!workflow && protoCanEdit(t)?`<button class="secondary" onclick="protoOpenEditTask(${t.id})">Edit</button>`:''}
+     <button class="secondary" onclick="protoToggleHistory(${t.id},'${context}')">Detail${((t.submissions?.length||0)+(t.comments?.length||0)+(t.editHistory?.length||0))?` (${(t.submissions?.length||0)+(t.comments?.length||0)+(t.editHistory?.length||0)})`:''}</button>
+     ${!workflow && protoCanDelete(t)?`<button class="secondary proto-delete" onclick="protoDeleteTask(${t.id})">Delete</button>`:''}
+   </div>
+ </div>
+ <div id="${detailId}" class="proto-detail hidden">
+   <b>Task Detail</b>
+
+   <div class="proto-history-section-title">Submission History</div>
+   <div class="proto-history">${t.submissions.length?t.submissions.map(s=>`
+     <div class="proto-history-item"><b>${s.by}</b> · ${s.time}
+       <div>${s.comment||'<span class="small">No comment</span>'}</div>
+       ${s.files?.length?protoAttachmentButtons(s.files):''}
+     </div>`).join(''):'<div class="small">No submissions yet.</div>'}</div>
+
+   <div class="proto-history-section-title">Edit History</div>
+   <div class="proto-edit-history">${(t.editHistory||[]).length?t.editHistory.map(e=>`
+     <div class="proto-edit-item"><b>${e.by}</b> · ${e.time}
+       <div>${e.summary}</div>
+     </div>`).join(''):'<div class="small">No edits yet.</div>'}</div>
+
+   <div class="proto-history-section-title">Comments</div>
+   <div class="proto-comments">${(t.comments||[]).length?t.comments.map(c=>`
+     <div class="proto-comment-item"><b>${c.by}</b> · ${c.time}<div>${c.text}</div></div>
+   `).join(''):'<div class="small">No comments yet.</div>'}</div>
+
+   <div class="proto-comment-box">
+     <textarea id="${commentId}" placeholder="Leave a comment..."></textarea>
+     <button class="primary" onclick="protoAddComment(${t.id},'${context}')">Post Comment</button>
+   </div>
+ </div>`;
+}
+function protoDeptBlock(dept,tasks){
+ const completed=tasks.filter(t=>t.status==='Completed').length;
+ return `<div class="proto-dept">
+   <div class="proto-dept-head"><h3>${dept}</h3><span class="small">${completed}/${tasks.length} Completed</span></div>
+   <div class="proto-task-grid proto-task-head">
+     <div>Task</div><div class="proto-owner">Owner</div><div>Status</div><div>Start Date</div><div>Target Date</div><div>Due Time</div><div class="proto-progress-col">% Complete</div><div>Action</div>
+   </div>
+   ${tasks.map(t=>protoTaskRow(t,false,'my')).join('')}
+ </div>`;
+}
+function renderProtoTasks(){
+ protoPopulateProjects();
+ const pid=protoCurrentProjectId('protoTaskProject');
+ if(!pid){
+   if($('protoTaskDepartments'))$('protoTaskDepartments').innerHTML='<div class="proto-empty">No project available.</div>';
+   return;
+ }
+ const all=protoAllTasks(pid);
+ const isSuper=currentUser?.role==='Super Admin';
+ const userDept=currentUser?.dept || currentUser?.department || '';
+ const tasks=isSuper ? all : all.filter(t=>t.dept===userDept);
+ if($('protoTaskSummary'))$('protoTaskSummary').innerHTML=protoSummaryHtml(tasks);
+ if($('protoTaskDepartments')){
+   const depts=isSuper
+     ? protoActiveDepartments()
+     : protoActiveDepartments().filter(d=>d.name===userDept);
+   $('protoTaskDepartments').innerHTML=depts.length
+     ? depts.map(d=>protoDeptBlock(d.name,tasks.filter(t=>t.dept===d.name))).join('')
+     : `<div class="proto-empty">No task department matched your profile (${userDept||'No Department'}).</div>`;
+ }
+ const addBtn=$('addTaskBtn');
+ if(addBtn)addBtn.classList.toggle('hidden',!protoCanAddTask());
+}
+function renderProtoWorkflow(){
+ protoPopulateProjects();
+ const pid=protoCurrentProjectId('protoWorkflowProject');
+ const taskSel=$('protoTaskProject');
+ if(taskSel && String(taskSel.value)!==String(pid))taskSel.value=pid;
+ const tasks=protoAllTasks(pid);
+ if($('protoWorkflowSummary'))$('protoWorkflowSummary').innerHTML=protoSummaryHtml(tasks);
+ if($('protoWorkflowDepartments'))$('protoWorkflowDepartments').innerHTML=protoActiveDepartments().map(d=>{
+   const list=tasks.filter(t=>t.dept===d.name);
+   const done=list.filter(t=>t.status==='Completed').length;
+   const submitted=list.filter(t=>t.status==='Submitted').length;
+   return `<div class="proto-dept">
+    <div class="proto-dept-head">
+      <h3>${d.name}</h3>
+      <span class="small">${done}/${list.length} Completed · ${submitted} Awaiting Confirmation</span>
+    </div>
+    <div class="proto-task-grid workflow-grid proto-task-head">
+      <div>Task</div><div class="proto-owner">Owner</div><div>Status</div><div>Start Date</div><div>Target Date</div><div class="proto-duration-col">Duration</div><div>Due Time</div><div class="proto-progress-col">% Complete</div><div>Detail</div>
+    </div>
+    ${list.map(t=>protoTaskRow(t,false,'workflow')).join('')}
+   </div>`;
+ }).join('');
+}
+function renderProtoMyTasks(){
+ const el=$('protoMyTasks'); if(!el)return;
+ projects.forEach(p=>protoSeedProject(p.id));
+ const all=Object.values(protoProjectTasks).flatMap(x=>Object.values(x).flat());
+ let mine=currentUser?.role==='Super Admin'
+   ? all.filter(t=>t.status!=='Completed')
+   : all.filter(t=>t.dept===currentUser?.dept && t.status!=='Completed');
+ const groups={};
+ mine.forEach(t=>{const p=protoProject(t.projectId)?.name||'Project';(groups[p]??=[]).push(t)});
+ el.innerHTML=Object.entries(groups).map(([p,list])=>`<div class="proto-dept"><div class="proto-dept-head"><h3>${p}</h3><span class="small">${list.length} Active Task(s)</span></div>${list.map(t=>protoTaskRow(t,true,'my')).join('')}</div>`).join('') || '<div class="card panel"><div class="small">No active tasks for your department.</div></div>';
+}
+function protoRenderAll(){
+ renderProtoTasks(); renderProtoWorkflow(); renderProtoMyTasks();
+ try{renderDashboard()}catch(e){}
+}
+function protoStartTask(id){
+ const t=protoTaskById(id); if(!t||!protoCanWork(t))return alert('You are not allowed to start this task.');
+ if(t.status!=='Not Started')return;
+ $('protoStartTaskId').value=id;
+ $('protoStartTargetDate').value=t.targetDate||'';
+ $('protoStartTitle').textContent=`Start Task — ${t.name}`;
+ openM('protoStartModal');
+}
+function protoConfirmStartTask(){
+ const t=protoTaskById($('protoStartTaskId').value); if(!t||!protoCanWork(t))return;
+ const target=$('protoStartTargetDate').value;
+ if(!target)return alert('Please set a Target Date.');
+ const today=new Date(); today.setHours(0,0,0,0);
+ const targetDate=new Date(target+'T00:00:00');
+ if(targetDate<today)return alert('Target Date cannot be earlier than today.');
+ t.targetDate=target;
+ t.status='In Progress';
+ t.startTime=nowStamp();
+ t.progress=40;
+ closeM('protoStartModal');
+ protoRenderAll();
+}
+function protoEscapeAttr(v){
+ return String(v||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function protoAttachmentButtons(files){
+ if(!files?.length)return '';
+ return `<div class="proto-attachment-list">${files.map((f,i)=>{
+   const label=escapeHtml(f.name||`Attachment ${i+1}`);
+   if(f.url){
+     return `<button type="button" class="proto-attachment-chip" onclick="protoPreviewAttachment('${protoEscapeAttr(f.url)}','${protoEscapeAttr(f.name)}','${protoEscapeAttr(f.type)}')">Preview · ${label}</button>`;
+   }
+   return `<span class="proto-attachment-chip" title="This older prototype attachment has no retained file data">${label} · Preview unavailable</span>`;
+ }).join('')}</div>`;
+}
+function protoPreviewAttachment(url,name,type){
+ if(!url)return alert('Preview is unavailable for this attachment.');
+ $('protoAttachmentPreviewTitle').textContent=name||'Attachment Preview';
+ $('protoAttachmentPreviewMeta').textContent=type||'File';
+ const body=$('protoAttachmentPreviewBody');
+ const safeUrl=protoEscapeAttr(url);
+ const safeName=escapeHtml(name||'Attachment');
+
+ if((type||'').startsWith('image/')){
+   body.innerHTML=`<img src="${safeUrl}" alt="${safeName}">`;
+ }else if(type==='application/pdf' || /\.pdf$/i.test(name||'')){
+   body.innerHTML=`<iframe src="${safeUrl}" title="${safeName}"></iframe>`;
+ }else if((type||'').startsWith('text/') || /\.(txt|csv|json|md)$/i.test(name||'')){
+   body.innerHTML=`<div style="text-align:center"><b>${safeName}</b><div class="small" style="margin-top:8px">Browser inline preview is not available for this prototype file type.</div><div style="margin-top:12px"><button class="primary" onclick="window.open('${safeUrl}','_blank')">Open File</button></div></div>`;
+ }else{
+   body.innerHTML=`<div style="text-align:center"><b>${safeName}</b><div class="small" style="margin-top:8px">This file type cannot be previewed inline.</div><div style="margin-top:12px"><button class="primary" onclick="window.open('${safeUrl}','_blank')">Open File</button></div></div>`;
+ }
+ openM('protoAttachmentPreviewModal');
+}
+function protoCloseAttachmentPreview(){
+ const body=$('protoAttachmentPreviewBody');
+ if(body)body.innerHTML='';
+ closeM('protoAttachmentPreviewModal');
+}
+function protoOpenEditTask(id){
+ const t=protoTaskById(id);
+ if(!t||!protoCanEdit(t))return alert('You are not allowed to edit this task.');
+ $('protoEditTaskId').value=id;
+ $('protoEditTaskName').value=t.name||'';
+ $('protoEditTaskTarget').value=t.targetDate||'';
+ $('protoEditTaskTitle').textContent=`Edit Task — ${t.name}`;
+ openM('protoEditTaskModal');
+}
+function protoSaveTaskEdit(){
+ const t=protoTaskById($('protoEditTaskId').value);
+ if(!t||!protoCanEdit(t))return alert('You are not allowed to edit this task.');
+ const newName=$('protoEditTaskName').value.trim();
+ const newTarget=$('protoEditTaskTarget').value;
+ if(!newName)return alert('Task name required.');
+
+ const changes=[];
+ if(newName!==t.name)changes.push(`Task Name: "${t.name}" → "${newName}"`);
+ if(newTarget!==(t.targetDate||''))changes.push(`Target Date: ${t.targetDate||'Blank'} → ${newTarget||'Blank'}`);
+
+ if(!changes.length){
+   closeM('protoEditTaskModal');
+   return;
+ }
+
+ t.editHistory=t.editHistory||[];
+ t.editHistory.push({
+   by:currentUser.name,
+   time:nowStamp(),
+   summary:changes.join(' · ')
+ });
+
+ t.name=newName;
+ t.targetDate=newTarget;
+ closeM('protoEditTaskModal');
+ protoRenderAll();
+}
+function protoAddComment(id,context='my'){
+ const t=protoTaskById(id);
+ if(!t||!currentUser)return;
+ const input=$(`protoComment_${context}_${id}`);
+ const text=input?.value.trim();
+ if(!text)return alert('Please enter a comment.');
+ t.comments=t.comments||[];
+ t.comments.push({
+   by:currentUser.name,
+   time:nowStamp(),
+   text
+ });
+ protoRenderAll();
+ const detail=$(`protoHistory_${context}_${id}`);
+ if(detail)detail.classList.remove('hidden');
+}
+function protoDeleteTask(id){
+ const t=protoTaskById(id);
+ if(!t||!protoCanDelete(t))return alert('You are not allowed to delete this task.');
+ if(!confirm(`Delete "${t.name}"? Submission history for this prototype task will also be deleted.`))return;
+ const group=protoProjectTasks[t.projectId]?.[t.dept];
+ if(!group)return;
+ const idx=group.findIndex(x=>Number(x.id)===Number(id));
+ if(idx>=0)group.splice(idx,1);
+ protoRenderAll();
+}
+function protoOpenSubmit(id){
+ const t=protoTaskById(id); if(!t||!protoCanWork(t))return alert('You are not allowed to submit this task.');
+ $('protoSubmitTaskId').value=id;
+ $('protoSubmitTitle').textContent=`Submit Update — ${t.name}`;
+ $('protoSubmitComment').value='';
+ $('protoSubmitFile').value='';
+ openM('protoSubmitModal');
+}
+function protoSaveSubmission(){
+ const t=protoTaskById($('protoSubmitTaskId').value); if(!t||!protoCanWork(t))return;
+ if(t.status==='Not Started')return alert('Please Start the task first.');
+ const files=[...($('protoSubmitFile')?.files||[])].map(f=>({name:f.name,size:f.size,type:f.type}));
+ t.submissions.push({id:protoSubmissionSeq++,by:currentUser.name,time:nowStamp(),comment:$('protoSubmitComment').value.trim(),files});
+ t.status='Submitted'; t.progress=80;
+ closeM('protoSubmitModal'); protoRenderAll();
+}
+function protoCompleteTask(id){
+ const t=protoTaskById(id);
+ if(!t||!protoCanComplete())return alert('Only Management department can confirm completion.');
+ if(t.status!=='Submitted')return alert('Task must be Submitted before it can be completed.');
+ const p=protoProject(t.projectId);
+ $('protoCompleteTaskId').value=id;
+ $('protoCompleteTitle').textContent=`Review & Complete — ${t.name}`;
+ $('protoCompleteComment').value='';
+
+ const info=$('protoCompleteTaskInfo');
+ if(info){
+   info.innerHTML=`<b>Task Information</b>
+     <div style="margin-top:7px;line-height:1.65">
+       Project: <b>${escapeHtml(p?.name||'—')}</b><br>
+       Department: <b>${escapeHtml(t.dept||'—')}</b><br>
+       Owner: <b>${escapeHtml(t.owner||'—')}</b><br>
+       Status: <b>${escapeHtml(t.status||'—')}</b><br>
+       Start Date: <b>${escapeHtml(protoDateOnly(t.startTime))}</b><br>
+       Target Date: <b>${escapeHtml(t.targetDate||'—')}</b><br>
+       Due Time: <b>${escapeHtml(protoElapsedDueTime(t))}</b>
+     </div>`;
+ }
+
+ const history=$('protoCompleteSubmissionHistory');
+ if(history){
+   history.innerHTML=(t.submissions||[]).length
+     ? t.submissions.map(s=>`
+       <div class="proto-history-item">
+         <b>${escapeHtml(s.by||'—')}</b> · ${escapeHtml(s.time||'—')}
+         <div>${escapeHtml(s.comment||'No comment')}</div>
+         ${s.files?.length?protoAttachmentButtons(s.files):''}
+       </div>`).join('')
+     : '<div class="small">No submission history available.</div>';
+ }
+
+ openM('protoCompleteModal');
+}
+function protoConfirmCompleteTask(){
+ const t=protoTaskById($('protoCompleteTaskId').value);
+ if(!t||!protoCanComplete())return alert('Only Management department can confirm completion.');
+ if(t.status!=='Submitted')return alert('Task must be Submitted before it can be completed.');
+ const comment=$('protoCompleteComment')?.value.trim();
+ t.status='Completed';
+ t.progress=100;
+ t.completedTime=nowStamp();
+ t.submissions.push({
+   id:protoSubmissionSeq++,
+   by:currentUser.name,
+   time:nowStamp(),
+   comment:comment ? `Completion confirmed: ${comment}` : 'Completion confirmed.',
+   files:[]
+ });
+ closeM('protoCompleteModal');
+ protoRenderAll();
+}
+function protoToggleHistory(id,context='my'){
+ const el=$(`protoHistory_${context}_${id}`);
+ if(el)el.classList.toggle('hidden');
+}
+function protoAddTask(){
+ if(!protoCanAddTask())return alert('You do not have permission to add project tasks.');
+ const deptSel=$('protoNewTaskDept');
+ const available=currentUser?.role==='Super Admin'
+   ? protoActiveDepartments()
+   : protoActiveDepartments().filter(d=>d.name===currentUser?.dept);
+ deptSel.innerHTML=available.map(d=>`<option>${d.name}</option>`).join('');
+ deptSel.disabled=currentUser?.role!=='Super Admin';
+ protoRefreshPic();
+ $('protoNewTaskName').value='';
+ openM('protoTaskModal');
+}
+function protoRefreshPic(){
+ const dept=$('protoNewTaskDept')?.value;
+ if(!$('protoNewTaskPic'))return;
+ const list=activeUsers().filter(u=>u.dept===dept);
+ $('protoNewTaskPic').innerHTML=(list.length?list:activeUsers()).map(u=>`<option>${u.name}</option>`).join('');
+}
+function protoSaveNewTask(){
+ const pid=protoCurrentProjectId('protoTaskProject');
+ const dept=currentUser?.role==='Super Admin' ? $('protoNewTaskDept').value : currentUser?.dept;
+ const name=$('protoNewTaskName').value.trim();
+ if(!name)return alert('Task name required.');
+ protoSeedProject(pid);
+ protoProjectTasks[pid][dept]??=[];
+ protoProjectTasks[pid][dept].push({
+   id:++protoTaskSeq,projectId:pid,dept,name,owner:$('protoNewTaskPic').value,priority:'Medium',
+   targetDate:'',status:'Not Started',startTime:'',completedTime:'',submissions:[],comments:[],editHistory:[],progress:0
+ });
+ closeM('protoTaskModal'); protoRenderAll();
+}
+document.addEventListener('change',e=>{if(e.target?.id==='protoNewTaskDept')protoRefreshPic()});
+setTimeout(()=>{try{protoPopulateProjects();protoRenderAll()}catch(e){console.warn('Prototype init',e)}},0);
+
+setInterval(()=>{
+  try{
+    if($('page-tasks') && !$('page-tasks').classList.contains('hidden'))renderProtoTasks();
+    if($('page-workflow') && !$('page-workflow').classList.contains('hidden'))renderProtoWorkflow();
+  }catch(e){}
+},60000);
+
+
+</script>
+
+
 
 </body>
 </html>
