@@ -561,7 +561,7 @@ button.confirm-delete{background:#b42318!important;color:#fff!important;border-c
 @media(max-width:800px){.default-task-head{display:none}.default-task-row{grid-template-columns:1fr}.default-task-note{text-align:left}.default-task-toolbar{align-items:stretch;flex-direction:column}}
 
 </style>
-<!-- WOW_BEAUTY_GITHUB_RELEASE_V8_3_DEFAULT_TASK_TEMPLATE_ADMIN: integrated production modules + new Dashboard/My Task/Workflow -->
+<!-- WOW_BEAUTY_GITHUB_RELEASE_V8_4_SUPABASE_CORE_SYNC: integrated production modules + new Dashboard/My Task/Workflow -->
 </head>
 <body>
 <section id="loginScreen" class="login-screen">
@@ -1209,6 +1209,7 @@ async function doLogin(){
    if($('loginRemember')?.checked)localStorage.setItem('wowBeautyLoginEmail',email);
    else localStorage.removeItem('wowBeautyLoginEmail');
    await loadUsersFromSupabase();
+   await loadCoreDataFromSupabase();
    applyLoggedInUser(u);
  }catch(err){
    console.error('Login error:',err);
@@ -1925,6 +1926,171 @@ function normalizeSequentialWorkflow(){
 }
 normalizeSequentialWorkflow();
 
+
+/* ===== V8.4 Supabase Core Data Sync =====
+   Scope: Projects + Default Task List + Project Tasks + task history/comments/submissions metadata.
+   Attachments are NOT persisted yet; Supabase Storage comes in the next phase.
+*/
+let wbCoreDataLoaded=false;
+let wbIdCounter=0;
+function wbNewId(){
+ wbIdCounter=(wbIdCounter+1)%1000;
+ return Date.now()*1000+wbIdCounter;
+}
+function wbProjectRow(p){
+ return {
+   id:Number(p.id), name:p.name||'', city:p.city||'', opening:p.opening||'',
+   progress:Number(p.progress||0), status:p.status||'Planning', lead:p.lead||'',
+   risk:p.risk||'', ai:p.ai||''
+ };
+}
+function wbTaskRow(t){
+ return {
+   id:Number(t.id), project_id:Number(t.projectId), dept:t.dept||'', name:t.name||'',
+   owner:t.owner||'', priority:t.priority||'Medium', target_date:t.targetDate||'',
+   status:t.status||'Not Started', start_time:t.startTime||'', completed_time:t.completedTime||'',
+   submissions:t.submissions||[], comments:t.comments||[], edit_history:t.editHistory||[],
+   progress:Number(t.progress||0), default_template_id:t.defaultTemplateId?Number(t.defaultTemplateId):null
+ };
+}
+function wbDefaultTaskRow(t){
+ return {
+   id:Number(t.id), dept:t.dept||'', name:t.name||'', priority:t.priority||'Medium',
+   sort_order:Number(t.order||1), active:true
+ };
+}
+function wbProjectFromRow(r){
+ return {
+   id:Number(r.id),name:r.name||'',city:r.city||'',opening:r.opening||'',
+   progress:Number(r.progress||0),status:r.status||'Planning',lead:r.lead||'',
+   risk:r.risk||'',ai:r.ai||''
+ };
+}
+function wbTaskFromRow(r){
+ return {
+   id:Number(r.id),projectId:Number(r.project_id),dept:r.dept||'',name:r.name||'',
+   owner:r.owner||'',priority:r.priority||'Medium',targetDate:r.target_date||'',
+   status:r.status||'Not Started',startTime:r.start_time||'',completedTime:r.completed_time||'',
+   submissions:Array.isArray(r.submissions)?r.submissions:[],
+   comments:Array.isArray(r.comments)?r.comments:[],
+   editHistory:Array.isArray(r.edit_history)?r.edit_history:[],
+   progress:Number(r.progress||0),
+   defaultTemplateId:r.default_template_id?Number(r.default_template_id):null
+ };
+}
+function wbDefaultTaskFromRow(r){
+ return {
+   id:Number(r.id),dept:r.dept||'',name:r.name||'',priority:r.priority||'Medium',
+   order:Number(r.sort_order||1)
+ };
+}
+async function wbSaveProject(p){
+ const {error}=await supabaseClient.from('wb_projects').upsert(wbProjectRow(p),{onConflict:'id'});
+ if(error)throw error;
+}
+async function wbDeleteProject(id){
+ const {error}=await supabaseClient.from('wb_projects').delete().eq('id',Number(id));
+ if(error)throw error;
+}
+async function wbSaveTask(t){
+ const {error}=await supabaseClient.from('wb_project_tasks').upsert(wbTaskRow(t),{onConflict:'id'});
+ if(error)throw error;
+}
+async function wbDeleteTask(id){
+ const {error}=await supabaseClient.from('wb_project_tasks').delete().eq('id',Number(id));
+ if(error)throw error;
+}
+async function wbSaveDefaultTask(t){
+ const {error}=await supabaseClient.from('wb_default_tasks').upsert(wbDefaultTaskRow(t),{onConflict:'id'});
+ if(error)throw error;
+}
+async function wbDeleteDefaultTask(id){
+ const {error}=await supabaseClient.from('wb_default_tasks').delete().eq('id',Number(id));
+ if(error)throw error;
+}
+async function wbBootstrapCoreData(){
+ if(!dashboardIsSuperAdmin())throw new Error('Initial Supabase setup requires Super Admin.');
+
+ // Build the same default tasks/project tasks currently used by the live HTML, then persist them once.
+ ensureDefaultTaskTemplate();
+ projects.forEach(p=>protoSeedProject(p.id));
+
+ const projectRows=projects.map(wbProjectRow);
+ if(projectRows.length){
+   const {error}=await supabaseClient.from('wb_projects').upsert(projectRows,{onConflict:'id'});
+   if(error)throw error;
+ }
+ const defaultRows=defaultTaskTemplate.map(wbDefaultTaskRow);
+ if(defaultRows.length){
+   const {error}=await supabaseClient.from('wb_default_tasks').upsert(defaultRows,{onConflict:'id'});
+   if(error)throw error;
+ }
+ const taskRows=projects.flatMap(p=>protoAllTasks(p.id)).map(wbTaskRow);
+ if(taskRows.length){
+   const {error}=await supabaseClient.from('wb_project_tasks').upsert(taskRows,{onConflict:'id'});
+   if(error)throw error;
+ }
+}
+async function loadCoreDataFromSupabase(){
+ const [pr,tr,dr]=await Promise.all([
+   supabaseClient.from('wb_projects').select('*').order('id'),
+   supabaseClient.from('wb_project_tasks').select('*').order('id'),
+   supabaseClient.from('wb_default_tasks').select('*').eq('active',true).order('dept').order('sort_order')
+ ]);
+ if(pr.error)throw pr.error;
+ if(tr.error)throw tr.error;
+ if(dr.error)throw dr.error;
+
+ // First deployment only: Super Admin bootstraps the current live data into Supabase.
+ if(!pr.data?.length){
+   if(!dashboardIsSuperAdmin()){
+     throw new Error('Core data is not initialized yet. Please sign in once with Super Admin to complete setup.');
+   }
+   await wbBootstrapCoreData();
+   return loadCoreDataFromSupabase();
+ }
+
+ projects.splice(0,projects.length,...pr.data.map(wbProjectFromRow));
+
+ // Replace prototype project tasks with database state.
+ Object.keys(protoProjectTasks).forEach(k=>delete protoProjectTasks[k]);
+ (tr.data||[]).map(wbTaskFromRow).forEach(t=>{
+   protoProjectTasks[t.projectId]??={};
+   protoProjectTasks[t.projectId][t.dept]??=[];
+   protoProjectTasks[t.projectId][t.dept].push(t);
+ });
+
+ // If an old project has no DB tasks, create from template and save once.
+ if(dr.data?.length){
+   defaultTaskTemplate=dr.data.map(wbDefaultTaskFromRow);
+ }else{
+   ensureDefaultTaskTemplate();
+   if(dashboardIsSuperAdmin()){
+     for(const t of defaultTaskTemplate)await wbSaveDefaultTask(t);
+   }
+ }
+
+ for(const p of projects){
+   if(!protoProjectTasks[p.id]){
+     protoSeedProject(p.id);
+     if(dashboardIsSuperAdmin()){
+       for(const t of protoAllTasks(p.id))await wbSaveTask(t);
+     }
+   }
+ }
+
+ const allTaskIds=projects.flatMap(p=>protoAllTasks(p.id)).map(t=>Number(t.id));
+ if(allTaskIds.length)protoTaskSeq=Math.max(protoTaskSeq,...allTaskIds.filter(Number.isFinite));
+ const defIds=defaultTaskTemplate.map(t=>Number(t.id)).filter(Number.isFinite);
+ if(defIds.length)defaultTaskTemplateSeq=Math.max(defaultTaskTemplateSeq,...defIds);
+
+ wbCoreDataLoaded=true;
+}
+function wbSyncError(label,err){
+ console.error(label,err);
+ alert(label+': '+(err?.message||'Unknown Supabase error'));
+}
+
 function renderAll(){
  if($('paymentListNav'))$('paymentListNav').classList.toggle('hidden',!paymentAccessAllowed());
  if($('storeInfoNav'))$('storeInfoNav').classList.toggle('hidden',!storeAccessAllowed());
@@ -2422,38 +2588,21 @@ function dashboardEditProject(projectId){
  if(!dashboardIsSuperAdmin())return alert('Only Super Admin can edit projects.');
  openProjectEditor(Number(projectId));
 }
-function dashboardDeleteProject(projectId){
+async function dashboardDeleteProject(projectId){
  if(!dashboardIsSuperAdmin())return alert('Only Super Admin can delete projects.');
  const pid=Number(projectId);
  const p=projects.find(x=>Number(x.id)===pid);
  if(!p)return alert('Project not found.');
-
- const ok=window.confirm(`Delete project "${p.name}"?\n\nThis will remove the project and its prototype task data.`);
- if(!ok)return;
-
- const idx=projects.findIndex(x=>Number(x.id)===pid);
- if(idx<0)return alert('Project not found.');
- projects.splice(idx,1);
+ if(!window.confirm(`Delete project "${p.name}"?\n\nThis will remove the project and all related tasks from Supabase.`))return;
 
  try{
-   if(typeof protoProjectTasks!=='undefined'){
-     delete protoProjectTasks[pid];
-     delete protoProjectTasks[String(pid)];
-   }
- }catch(e){console.warn('Task cleanup:',e)}
-
- try{
-   if(typeof storeInfoData!=='undefined' && storeInfoData[pid]?.source==='Project'){
-     delete storeInfoData[pid];
-   }
- }catch(e){console.warn('Store cleanup:',e)}
-
- // Refresh selectors first, then dashboard. Do not call protoRenderAll here to avoid recursive dashboard rendering.
- try{protoPopulateProjects()}catch(e){}
- try{renderProtoTasks()}catch(e){}
- try{renderProtoWorkflow()}catch(e){}
- try{renderProtoMyTasks()}catch(e){}
- renderDashboard();
+   await wbDeleteProject(pid);
+   const idx=projects.findIndex(x=>Number(x.id)===pid);
+   if(idx>=0)projects.splice(idx,1);
+   delete protoProjectTasks[pid]; delete protoProjectTasks[String(pid)];
+   if(typeof storeInfoData!=='undefined' && storeInfoData[pid]?.source==='Project')delete storeInfoData[pid];
+   protoPopulateProjects();renderProtoTasks();renderProtoWorkflow();renderDashboard();renderPendingTasks();
+ }catch(e){wbSyncError('Project delete failed',e)}
 }
 function renderDashboard(){
  dashboardRenderProjectControls();
@@ -2778,19 +2927,31 @@ function deleteProject(id,confirmed=false){
  }
 }
 
-function saveProject(){
+async function saveProject(){
  if(!dashboardIsSuperAdmin())return alert('Only Super Admin can add or edit projects.');
  const id=+$('editProjectId').value;
  const obj={id:id||Date.now(),name:$('projName').value.trim(),city:$('projCity').value.trim(),opening:$('projOpening').value.trim(),progress:Math.max(0,Math.min(100,+$('projProgress').value||0)),status:$('projStatus').value,lead:$('projLead').value,risk:$('projRisk').value.trim(),ai:$('projAI').value.trim()};
  if(!obj.name)return alert('Project name is required.');
- if(id){
-   Object.assign(projects.find(x=>x.id===id),obj);
- }else{
-   projects.push(obj);
-   initializeProjectFirstMission(obj);
- }
- closeM('projectEditorModal');renderAll();
- try{protoRenderAll()}catch(e){}
+ const isNew=!id;
+ try{
+   if(id){
+     const current=projects.find(x=>x.id===id);
+     if(!current)return alert('Project not found.');
+     Object.assign(current,obj);
+   }else{
+     projects.push(obj);
+   }
+
+   await wbSaveProject(obj);
+
+   if(isNew){
+     protoSeedProject(obj.id);
+     for(const t of protoAllTasks(obj.id))await wbSaveTask(t);
+   }
+
+   closeM('projectEditorModal');
+   renderAll();
+ }catch(e){wbSyncError('Project sync failed',e)}
 }
 
 let currentProjectId=null;
@@ -3192,24 +3353,35 @@ function normalizeDefaultTaskOrders(dept){
  const list=defaultTaskTemplate.filter(t=>t.dept===dept).sort((a,b)=>(a.order||999)-(b.order||999)||a.id-b.id);
  list.forEach((t,i)=>t.order=i+1);
 }
-function saveDefaultTaskTemplate(){
+async function saveDefaultTaskTemplate(){
  if(!dashboardIsSuperAdmin())return alert('Only Super Admin can edit the Default Task List.');
  const id=Number($('defaultTaskEditId').value||0),name=$('defaultTaskName').value.trim(),dept=$('defaultTaskDept').value;
  const priority=$('defaultTaskPriority').value,order=Math.max(1,Number($('defaultTaskOrder').value)||1);
  if(!name)return alert('Task name is required.'); if(!dept)return alert('Department is required.');
  const existing=defaultTaskTemplate.find(x=>Number(x.id)===id),oldDept=existing?.dept;
- if(existing)Object.assign(existing,{name,dept,priority,order});
- else defaultTaskTemplate.push({id:++defaultTaskTemplateSeq,name,dept,priority,order});
- if(oldDept&&oldDept!==dept)normalizeDefaultTaskOrders(oldDept); normalizeDefaultTaskOrders(dept);
- closeM('defaultTaskEditorModal');renderDefaultTaskList();
- alert('Default Task List updated. New projects will use this template.');
+ const t=existing||{id:wbNewId()};
+ Object.assign(t,{name,dept,priority,order});
+ if(!existing)defaultTaskTemplate.push(t);
+ if(oldDept&&oldDept!==dept)normalizeDefaultTaskOrders(oldDept);normalizeDefaultTaskOrders(dept);
+ try{
+   // Save all tasks in affected departments so their order remains consistent in Supabase.
+   const affected=[...new Set([oldDept,dept].filter(Boolean))];
+   for(const d of affected)for(const x of defaultTaskTemplate.filter(z=>z.dept===d))await wbSaveDefaultTask(x);
+   closeM('defaultTaskEditorModal');renderDefaultTaskList();
+   alert('Default Task List saved to Supabase. New projects will use this template.');
+ }catch(e){wbSyncError('Default Task sync failed',e)}
 }
-function deleteDefaultTaskTemplate(id){
+async function deleteDefaultTaskTemplate(id){
  if(!dashboardIsSuperAdmin())return alert('Only Super Admin can edit the Default Task List.');
  const t=defaultTaskTemplate.find(x=>Number(x.id)===Number(id));if(!t)return;
  if(!confirm(`Delete default task "${t.name}"?\n\nExisting project tasks will not be affected.`))return;
- const idx=defaultTaskTemplate.findIndex(x=>Number(x.id)===Number(id));if(idx>=0)defaultTaskTemplate.splice(idx,1);
- normalizeDefaultTaskOrders(t.dept);renderDefaultTaskList();
+ try{
+   await wbDeleteDefaultTask(t.id);
+   const idx=defaultTaskTemplate.findIndex(x=>Number(x.id)===Number(id));if(idx>=0)defaultTaskTemplate.splice(idx,1);
+   normalizeDefaultTaskOrders(t.dept);
+   for(const x of defaultTaskTemplate.filter(z=>z.dept===t.dept))await wbSaveDefaultTask(x);
+   renderDefaultTaskList();
+ }catch(e){wbSyncError('Default Task delete failed',e)}
 }
 function renderDepartments(){$('departmentRows').innerHTML=departments.map(d=>`<tr><td>${d.name}</td><td>${d.code}</td><td>${d.status}</td><td><button class="secondary" onclick="openDepartment(${d.id})">Edit</button></td></tr>`).join('')}
 function openDepartment(id){$('deptId').value=id||'';const d=departments.find(x=>x.id===id);$('deptName').value=d?.name||'';$('deptCode').value=d?.code||'';$('deptStatus').value=d?.status||'Active';openM('deptModal')}
@@ -3478,7 +3650,7 @@ function ensureDefaultTaskTemplate(){
  if(defaultTaskTemplate.length)return;
  protoActiveDepartments().forEach(d=>{
    [1,2,3,4,5].forEach((n,i)=>defaultTaskTemplate.push({
-     id:++defaultTaskTemplateSeq,dept:d.name,name:`${d.name} Task ${n}`,
+     id:wbNewId(),dept:d.name,name:`${d.name} Task ${n}`,
      priority:i===0?'High':i<3?'Medium':'Low',order:n
    }));
  });
@@ -3497,7 +3669,7 @@ function protoSeedProject(pid){
    const deptUsers=activeUsers().filter(u=>u.dept===d.name);
    const pic=deptUsers[0]?.name || lead;
    byDept[d.name]=defaultTasksForDepartment(d.name).map(def=>({
-     id:++protoTaskSeq,projectId:pid,dept:d.name,name:def.name,owner:pic,
+     id:wbNewId(),projectId:pid,dept:d.name,name:def.name,owner:pic,
      priority:def.priority||'Medium',targetDate:'',status:'Not Started',
      startTime:'',completedTime:'',submissions:[],comments:[],editHistory:[],progress:0,
      defaultTemplateId:def.id
@@ -3733,19 +3905,17 @@ function protoStartTask(id){
  $('protoStartTitle').textContent=`Start Task — ${t.name}`;
  openM('protoStartModal');
 }
-function protoConfirmStartTask(){
+async function protoConfirmStartTask(){
  const t=protoTaskById($('protoStartTaskId').value); if(!t||!protoCanWork(t))return;
  const target=$('protoStartTargetDate').value;
  if(!target)return alert('Please set a Target Date.');
  const today=new Date(); today.setHours(0,0,0,0);
  const targetDate=new Date(target+'T00:00:00');
  if(targetDate<today)return alert('Target Date cannot be earlier than today.');
- t.targetDate=target;
- t.status='In Progress';
- t.startTime=nowStamp();
- t.progress=40;
- closeM('protoStartModal');
- protoRenderAll();
+ const before={targetDate:t.targetDate,status:t.status,startTime:t.startTime,progress:t.progress};
+ t.targetDate=target;t.status='In Progress';t.startTime=nowStamp();t.progress=40;
+ try{await wbSaveTask(t);closeM('protoStartModal');protoRenderAll();}
+ catch(e){Object.assign(t,before);wbSyncError('Task start sync failed',e)}
 }
 function protoEscapeAttr(v){
  return String(v||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -3793,7 +3963,7 @@ function protoOpenEditTask(id){
  $('protoEditTaskTitle').textContent=`Edit Task — ${t.name}`;
  openM('protoEditTaskModal');
 }
-function protoSaveTaskEdit(){
+async function protoSaveTaskEdit(){
  const t=protoTaskById($('protoEditTaskId').value);
  if(!t||!protoCanEdit(t))return alert('You are not allowed to edit this task.');
  const newName=$('protoEditTaskName').value.trim();
@@ -3818,10 +3988,10 @@ function protoSaveTaskEdit(){
 
  t.name=newName;
  t.targetDate=newTarget;
- closeM('protoEditTaskModal');
- protoRenderAll();
+ try{await wbSaveTask(t);closeM('protoEditTaskModal');protoRenderAll();}
+ catch(e){wbSyncError('Task edit sync failed',e)}
 }
-function protoAddComment(id,context='my'){
+async function protoAddComment(id,context='my'){
  const t=protoTaskById(id);
  if(!t||!currentUser)return;
  const input=$(`protoComment_${context}_${id}`);
@@ -3833,19 +4003,24 @@ function protoAddComment(id,context='my'){
    time:nowStamp(),
    text
  });
+ try{await wbSaveTask(t)}catch(e){return wbSyncError('Comment sync failed',e)}
  protoRenderAll();
  const detail=$(`protoHistory_${context}_${id}`);
  if(detail)detail.classList.remove('hidden');
 }
-function protoDeleteTask(id){
+async function protoDeleteTask(id){
  const t=protoTaskById(id);
  if(!t||!protoCanDelete(t))return alert('You are not allowed to delete this task.');
- if(!confirm(`Delete "${t.name}"? Submission history for this prototype task will also be deleted.`))return;
- const group=protoProjectTasks[t.projectId]?.[t.dept];
- if(!group)return;
- const idx=group.findIndex(x=>Number(x.id)===Number(id));
- if(idx>=0)group.splice(idx,1);
- protoRenderAll();
+ if(!confirm(`Delete "${t.name}"? Submission history will also be deleted.`))return;
+ try{
+   await wbDeleteTask(t.id);
+   const group=protoProjectTasks[t.projectId]?.[t.dept];
+   if(group){
+     const idx=group.findIndex(x=>Number(x.id)===Number(id));
+     if(idx>=0)group.splice(idx,1);
+   }
+   protoRenderAll();
+ }catch(e){wbSyncError('Task delete failed',e)}
 }
 function protoOpenSubmit(id){
  const t=protoTaskById(id); if(!t||!protoCanWork(t))return alert('You are not allowed to submit this task.');
@@ -3855,13 +4030,15 @@ function protoOpenSubmit(id){
  $('protoSubmitFile').value='';
  openM('protoSubmitModal');
 }
-function protoSaveSubmission(){
+async function protoSaveSubmission(){
  const t=protoTaskById($('protoSubmitTaskId').value); if(!t||!protoCanWork(t))return;
  if(t.status==='Not Started')return alert('Please Start the task first.');
  const files=[...($('protoSubmitFile')?.files||[])].map(f=>({name:f.name,size:f.size,type:f.type}));
- t.submissions.push({id:protoSubmissionSeq++,by:currentUser.name,time:nowStamp(),comment:$('protoSubmitComment').value.trim(),files});
- t.status='Submitted'; t.progress=80;
- closeM('protoSubmitModal'); protoRenderAll();
+ t.submissions=t.submissions||[];
+ t.submissions.push({id:wbNewId(),by:currentUser.name,time:nowStamp(),comment:$('protoSubmitComment').value.trim(),files});
+ t.status='Submitted';t.progress=80;
+ try{await wbSaveTask(t);closeM('protoSubmitModal');protoRenderAll();}
+ catch(e){wbSyncError('Submission sync failed',e)}
 }
 function protoCompleteTask(id){
  const t=protoTaskById(id);
@@ -3900,7 +4077,7 @@ function protoCompleteTask(id){
 
  openM('protoCompleteModal');
 }
-function protoConfirmCompleteTask(){
+async function protoConfirmCompleteTask(){
  const t=protoTaskById($('protoCompleteTaskId').value);
  if(!t||!protoCanComplete())return alert('Only Management department can confirm completion.');
  if(t.status!=='Submitted')return alert('Task must be Submitted before it can be completed.');
@@ -3909,14 +4086,14 @@ function protoConfirmCompleteTask(){
  t.progress=100;
  t.completedTime=nowStamp();
  t.submissions.push({
-   id:protoSubmissionSeq++,
+   id:wbNewId(),
    by:currentUser.name,
    time:nowStamp(),
    comment:comment ? `Completion confirmed: ${comment}` : 'Completion confirmed.',
    files:[]
  });
- closeM('protoCompleteModal');
- protoRenderAll();
+ try{await wbSaveTask(t);closeM('protoCompleteModal');protoRenderAll();}
+ catch(e){wbSyncError('Completion sync failed',e)}
 }
 function protoToggleHistory(id,context='my'){
  const el=$(`protoHistory_${context}_${id}`);
@@ -3940,18 +4117,21 @@ function protoRefreshPic(){
  const list=activeUsers().filter(u=>u.dept===dept);
  $('protoNewTaskPic').innerHTML=(list.length?list:activeUsers()).map(u=>`<option>${u.name}</option>`).join('');
 }
-function protoSaveNewTask(){
+async function protoSaveNewTask(){
  const pid=protoCurrentProjectId('protoTaskProject');
  const dept=currentUser?.role==='Super Admin' ? $('protoNewTaskDept').value : currentUser?.dept;
  const name=$('protoNewTaskName').value.trim();
  if(!name)return alert('Task name required.');
- protoSeedProject(pid);
- protoProjectTasks[pid][dept]??=[];
- protoProjectTasks[pid][dept].push({
-   id:++protoTaskSeq,projectId:pid,dept,name,owner:$('protoNewTaskPic').value,priority:'Medium',
+ protoSeedProject(pid);protoProjectTasks[pid][dept]??=[];
+ const t={
+   id:wbNewId(),projectId:pid,dept,name,owner:$('protoNewTaskPic').value,priority:'Medium',
    targetDate:'',status:'Not Started',startTime:'',completedTime:'',submissions:[],comments:[],editHistory:[],progress:0
- });
- closeM('protoTaskModal'); protoRenderAll();
+ };
+ try{
+   await wbSaveTask(t);
+   protoProjectTasks[pid][dept].push(t);
+   closeM('protoTaskModal');protoRenderAll();
+ }catch(e){wbSyncError('New task sync failed',e)}
 }
 document.addEventListener('change',e=>{if(e.target?.id==='protoNewTaskDept')protoRefreshPic()});
 setTimeout(()=>{try{protoPopulateProjects();protoRenderAll()}catch(e){console.warn('Prototype init',e)}},0);
