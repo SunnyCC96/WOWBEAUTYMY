@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>WOW BEAUTY Store Opening Control V2.4</title>
+<title>WOW BEAUTY | BD & Store Development Portal</title>
 <style>
 :root{--bg:#f4f7fb;--card:#fff;--ink:#15243a;--muted:#6f7f92;--line:#e5edf5;--nav:#13283e;--accent:#2f80ed;--ok:#20ae72;--warn:#f5a623;--bad:#e95151;--purple:#7758d8}
 *{box-sizing:border-box}body{margin:0;font-family:Inter,Segoe UI,Arial,sans-serif;background:var(--bg);color:var(--ink)}
@@ -179,19 +179,227 @@ button.danger{border-color:#efb5b5;color:#a61b1b;background:#fff5f5}
 
 button.confirm-delete{background:#b42318!important;color:#fff!important;border-color:#b42318!important;font-weight:800}
 
+
+/* ===== WOW BEAUTY Login Cover V6.5 ===== */
+#loginScreen.login-screen{
+  min-height:100vh;
+  display:grid;
+  grid-template-columns:minmax(0,1.08fr) minmax(420px,.92fr);
+  position:relative;
+  isolation:isolate;
+  overflow-x:hidden;
+  color:#1d2330;
+  background:
+    radial-gradient(circle at 18% 20%, rgba(255,255,255,.95) 0 6%, transparent 25%),
+    linear-gradient(135deg,#fff8fa 0%,#f8d9df 45%,#f4c8d1 100%);
+  font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;
+}
+#loginScreen.login-screen.hidden{display:none!important}
+#loginScreen.login-screen::before{
+  content:"";position:absolute;width:760px;height:760px;border:36px solid rgba(255,255,255,.32);
+  border-radius:50%;right:23%;top:-360px;z-index:-1;
+}
+#loginScreen.login-screen::after{
+  content:"";position:absolute;inset:auto auto -110px -80px;width:620px;height:250px;
+  background:linear-gradient(90deg,rgba(255,255,255,.25),rgba(255,255,255,.05)),rgba(213,104,129,.15);
+  border:1px solid rgba(255,255,255,.35);transform:skewY(-5deg);backdrop-filter:blur(2px);z-index:-1;
+}
+#loginScreen .wb-brand-side{
+  position:relative;padding:64px clamp(42px,7vw,120px);display:flex;align-items:center;overflow:hidden;
+}
+#loginScreen .wb-brand-panel{width:min(620px,100%);position:relative;z-index:2}
+#loginScreen .wb-logo{
+  display:inline-flex;flex-direction:column;line-height:.82;margin-bottom:44px;color:#231517;user-select:none;
+}
+#loginScreen .wb-logo .wb-wow{
+  font-size:clamp(72px,9vw,132px);font-weight:950;letter-spacing:-.08em;font-style:italic;transform:skewX(-7deg);
+}
+#loginScreen .wb-logo .wb-beauty{
+  margin-top:14px;font-size:clamp(38px,5vw,72px);font-weight:800;letter-spacing:.08em;
+}
+#loginScreen .wb-tagline{
+  font-size:clamp(18px,1.8vw,28px);letter-spacing:.32em;line-height:1.8;color:#51383e;
+  text-transform:uppercase;margin:0 0 28px;
+}
+#loginScreen .wb-accent-line{width:50px;height:5px;border-radius:99px;background:#e45b7b;margin:10px 0 48px}
+#loginScreen .wb-features{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;max-width:600px}
+#loginScreen .wb-feature{text-align:center;color:#563f45;padding:8px 4px;position:relative}
+#loginScreen .wb-feature:not(:last-child)::after{
+  content:"";position:absolute;right:-9px;top:18px;height:52px;width:1px;background:rgba(81,56,62,.22);
+}
+#loginScreen .wb-feature svg{width:29px;height:29px;margin-bottom:10px;stroke:currentColor;fill:none;stroke-width:1.7}
+#loginScreen .wb-feature strong{
+  display:block;font-size:12px;letter-spacing:.18em;text-transform:uppercase;line-height:1.45;font-weight:650;
+}
+#loginScreen .wb-internal{
+  position:absolute;left:clamp(42px,7vw,120px);bottom:42px;font-size:13px;line-height:1.65;color:#4d3a40;
+}
+#loginScreen .wb-ghost-store{
+  position:absolute;right:-110px;top:13%;width:460px;height:74%;border-radius:240px 0 0 0;
+  background:linear-gradient(180deg,rgba(255,255,255,.35),rgba(255,255,255,.08)),rgba(255,255,255,.10);
+  border-left:1px solid rgba(255,255,255,.45);box-shadow:inset 0 0 80px rgba(255,255,255,.18);z-index:1;
+}
+#loginScreen .wb-ghost-store::before,#loginScreen .wb-ghost-store::after{
+  content:"";position:absolute;left:48px;right:56px;height:62px;border:1px solid rgba(255,255,255,.35);
+  background:rgba(255,255,255,.12);
+  box-shadow:0 95px 0 rgba(255,255,255,.08),0 190px 0 rgba(255,255,255,.07),0 285px 0 rgba(255,255,255,.06);
+}
+#loginScreen .wb-ghost-store::before{top:170px}
+#loginScreen .wb-ghost-store::after{top:205px;height:8px}
+#loginScreen .wb-login-side{
+  display:flex;align-items:center;justify-content:center;padding:64px 5vw;position:relative;
+  background:linear-gradient(90deg,rgba(255,255,255,.02),rgba(255,255,255,.17));
+}
+#loginScreen .wb-login-card{
+  width:min(610px,100%);background:rgba(255,255,255,.92);border:1px solid rgba(255,255,255,.8);
+  border-radius:26px;box-shadow:0 28px 80px rgba(115,70,82,.16);backdrop-filter:blur(14px);
+  padding:clamp(34px,4vw,58px);
+}
+#loginScreen .wb-mini-logo{display:flex;align-items:baseline;gap:14px;margin-bottom:38px;color:#10151f}
+#loginScreen .wb-mini-wow{font-size:42px;font-weight:950;font-style:italic;letter-spacing:-.07em;transform:skewX(-6deg)}
+#loginScreen .wb-mini-beauty{font-size:31px;font-weight:700;letter-spacing:.03em}
+#loginScreen .wb-login-card h1{margin:0 0 8px;font-size:clamp(26px,2.5vw,38px);letter-spacing:-.03em}
+#loginScreen .wb-subtitle{margin:0 0 38px;color:#748097;font-size:16px;line-height:1.6;max-width:500px}
+#loginScreen .wb-field{margin-bottom:22px}
+#loginScreen .wb-field>label{display:block;font-size:14px;font-weight:650;margin-bottom:9px}
+#loginScreen .wb-input-wrap{
+  height:58px;display:flex;align-items:center;border:1px solid #dfe4ec;background:#fff;border-radius:13px;
+  transition:.2s ease;overflow:hidden;
+}
+#loginScreen .wb-input-wrap:focus-within{border-color:#e45b7b;box-shadow:0 0 0 4px rgba(228,91,123,.10)}
+#loginScreen .wb-input-icon{width:52px;height:100%;display:grid;place-items:center;color:#8290a4;flex:0 0 auto}
+#loginScreen .wb-input-icon svg,#loginScreen .wb-toggle-password svg{
+  width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:1.8;
+}
+#loginScreen .wb-input-wrap input{
+  border:0!important;outline:0!important;width:100%;height:100%;font:inherit;font-size:16px;
+  padding:0 14px 0 0!important;background:transparent!important;color:#1d2330!important;box-shadow:none!important;
+}
+#loginScreen .wb-input-wrap input::placeholder{color:#a4adba}
+#loginScreen .wb-toggle-password{
+  border:0;background:transparent;color:#8490a3;width:48px;height:100%;cursor:pointer;display:grid;place-items:center;padding:0;
+}
+#loginScreen .wb-toggle-password:hover{color:#d94a6a}
+#loginScreen .wb-options{
+  display:flex;align-items:center;justify-content:space-between;gap:18px;margin:4px 0 28px;font-size:14px;
+}
+#loginScreen .wb-remember{display:flex;align-items:center;gap:9px;color:#4c5768;margin:0;font-weight:400}
+#loginScreen .wb-remember input{width:17px;height:17px;accent-color:#e45b7b}
+#loginScreen .wb-forgot{color:#d94a6a;text-decoration:none;font-weight:600}
+#loginScreen .wb-forgot:hover{text-decoration:underline}
+#loginScreen .wb-login-btn{
+  width:100%;height:58px;border:0!important;border-radius:13px!important;
+  background:linear-gradient(135deg,#e45b7b,#dc5576)!important;color:white!important;font-size:17px;font-weight:700;
+  cursor:pointer;box-shadow:0 10px 26px rgba(220,85,118,.25);transition:.18s ease;padding:0!important;
+}
+#loginScreen .wb-login-btn:hover{transform:translateY(-1px);box-shadow:0 14px 30px rgba(220,85,118,.33)}
+#loginScreen .wb-login-btn:active{transform:translateY(0)}
+#loginScreen .wb-login-btn:disabled{opacity:.65;cursor:wait;transform:none}
+#loginScreen .wb-footer{position:absolute;right:5vw;bottom:34px;font-size:13px;color:#5e4a50}
+@media(max-width:1000px){
+  #loginScreen.login-screen{grid-template-columns:1fr}
+  #loginScreen .wb-brand-side{min-height:380px;padding-bottom:100px}
+  #loginScreen .wb-ghost-store{opacity:.45}
+  #loginScreen .wb-login-side{padding:36px 22px 90px}
+  #loginScreen .wb-internal{bottom:26px}
+  #loginScreen .wb-footer{right:22px;bottom:24px}
+}
+@media(max-width:620px){
+  #loginScreen .wb-brand-side{padding:44px 24px 90px}
+  #loginScreen .wb-internal{left:24px}
+  #loginScreen .wb-features{grid-template-columns:repeat(2,1fr)}
+  #loginScreen .wb-feature:nth-child(2)::after{display:none}
+  #loginScreen .wb-mini-wow{font-size:34px}
+  #loginScreen .wb-mini-beauty{font-size:24px}
+  #loginScreen .wb-login-card{border-radius:20px;padding:30px 22px}
+  #loginScreen .wb-options{align-items:flex-start;flex-direction:column}
+  #loginScreen .wb-tagline{letter-spacing:.22em}
+}
+
 </style>
 </head>
 <body>
 <section id="loginScreen" class="login-screen">
-  <div class="login-card" autocomplete="off">
-    <div class="brand">WOW <span>BEAUTY</span></div>
-    <h1 style="margin-top:18px">Store Opening Control V2.4</h1>
-    <div class="sub">Sequential PIC task handoff + submission / return + comments / attachments.</div>
-    <label>Email</label><input id="loginEmail" type="email" placeholder="adminmy@wowcolour.com" autocomplete="username">
-    <label>Password</label><input id="loginPw" type="password" value="" autocomplete="new-password">
-    <button class="primary" style="width:100%;margin-top:20px" onclick="doLogin()">Login</button>
-    
-  </div>
+  <section class="wb-brand-side">
+    <div class="wb-brand-panel">
+      <div class="wb-logo" aria-label="WOW BEAUTY">
+        <span class="wb-wow">WOW</span>
+        <span class="wb-beauty">BEAUTY</span>
+      </div>
+
+      <p class="wb-tagline">Beauty brings<br>a brighter you</p>
+      <div class="wb-accent-line"></div>
+
+      <div class="wb-features">
+        <div class="wb-feature">
+          <svg viewBox="0 0 24 24"><path d="M3 10h18M5 10v9h14v-9M4 10l2-5h12l2 5M8 19v-5h4v5"/></svg>
+          <strong>Expand<br>More</strong>
+        </div>
+        <div class="wb-feature">
+          <svg viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="16" rx="2"/><path d="M9 4V2h6v2M8 10l2 2 4-4M8 16h8"/></svg>
+          <strong>Open<br>Smarter</strong>
+        </div>
+        <div class="wb-feature">
+          <svg viewBox="0 0 24 24"><path d="M4 20V12h4v8M10 20V7h4v13M16 20V3h4v17"/></svg>
+          <strong>Manage<br>Better</strong>
+        </div>
+        <div class="wb-feature">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="7" r="3"/><circle cx="5" cy="10" r="2.5"/><circle cx="19" cy="10" r="2.5"/><path d="M7 21v-2a5 5 0 0 1 10 0v2M1 20v-1a4 4 0 0 1 6-3.5M23 20v-1a4 4 0 0 0-6-3.5"/></svg>
+          <strong>Grow<br>Together</strong>
+        </div>
+      </div>
+    </div>
+
+    <div class="wb-ghost-store" aria-hidden="true"></div>
+    <div class="wb-internal"><strong>WOW BEAUTY Malaysia</strong><br>Internal Use Only</div>
+  </section>
+
+  <section class="wb-login-side">
+    <form class="wb-login-card" id="loginForm" autocomplete="off" onsubmit="event.preventDefault();doLogin();">
+      <div class="wb-mini-logo" aria-label="WOW BEAUTY">
+        <span class="wb-mini-wow">WOW</span>
+        <span class="wb-mini-beauty">BEAUTY</span>
+      </div>
+
+      <h1>BD &amp; Store Development Portal</h1>
+      <p class="wb-subtitle">Manage store expansion, opening projects, leases and operating costs.</p>
+
+      <div class="wb-field">
+        <label for="loginEmail">Email</label>
+        <div class="wb-input-wrap">
+          <span class="wb-input-icon">
+            <svg viewBox="0 0 24 24"><path d="M4 6h16v12H4z"/><path d="m4 7 8 6 8-6"/></svg>
+          </span>
+          <input id="loginEmail" name="email" type="email" autocomplete="username" placeholder="adminmy@wowcolour.com" required>
+        </div>
+      </div>
+
+      <div class="wb-field">
+        <label for="loginPw">Password</label>
+        <div class="wb-input-wrap">
+          <span class="wb-input-icon">
+            <svg viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+          </span>
+          <input id="loginPw" name="password" type="password" autocomplete="current-password" placeholder="Enter your password" required>
+          <button class="wb-toggle-password" type="button" id="loginTogglePassword" aria-label="Show password">
+            <svg viewBox="0 0 24 24"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="2.5"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="wb-options">
+        <label class="wb-remember">
+          <input type="checkbox" id="loginRemember">
+          <span>Remember email</span>
+        </label>
+        <a href="#" class="wb-forgot" onclick="forgotPassword(event)">Forgot password?</a>
+      </div>
+
+      <button class="wb-login-btn primary" type="submit">Login</button>
+    </form>
+
+    <div class="wb-footer">Version 2.4</div>
+  </section>
 </section>
 
 <div id="app" class="shell hidden">
@@ -615,12 +823,44 @@ function applyLoggedInUser(u){
  renderAll();
 }
 
+function initLoginCover(){
+ const toggle=$('loginTogglePassword');
+ const pw=$('loginPw');
+ if(toggle && pw && !toggle.dataset.bound){
+   toggle.dataset.bound='1';
+   toggle.addEventListener('click',()=>{
+     const showing=pw.type==='text';
+     pw.type=showing?'password':'text';
+     toggle.setAttribute('aria-label',showing?'Show password':'Hide password');
+   });
+ }
+ const savedEmail=localStorage.getItem('wowBeautyLoginEmail');
+ if(savedEmail && $('loginEmail')){
+   $('loginEmail').value=savedEmail;
+   if($('loginRemember'))$('loginRemember').checked=true;
+ }
+}
+async function forgotPassword(e){
+ if(e)e.preventDefault();
+ const email=$('loginEmail')?.value.trim();
+ if(!email)return alert('Please enter your email first.');
+ try{
+   const {error}=await supabaseClient.auth.resetPasswordForEmail(email,{redirectTo:location.origin});
+   if(error)throw error;
+   alert('Password reset email sent. Please check your inbox.');
+ }catch(err){
+   console.error('Password reset error:',err);
+   alert('Unable to send reset email: '+(err?.message||'Unknown error'));
+ }
+}
+initLoginCover();
+
 async function doLogin(){
  const email=$('loginEmail').value.trim();
  const password=$('loginPw').value;
  if(!email||!password)return alert('Please enter email and password.');
 
- const btn=document.querySelector('#loginScreen .primary');
+ const btn=document.querySelector('#loginScreen .wb-login-btn');
  if(btn){btn.disabled=true;btn.textContent='Signing in...';}
 
  try{
@@ -648,6 +888,8 @@ async function doLogin(){
      status:profile.status
    };
    currentUser=u;
+   if($('loginRemember')?.checked)localStorage.setItem('wowBeautyLoginEmail',email);
+   else localStorage.removeItem('wowBeautyLoginEmail');
    await loadUsersFromSupabase();
    applyLoggedInUser(u);
  }catch(err){
