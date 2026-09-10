@@ -548,8 +548,20 @@ button.confirm-delete{background:#b42318!important;color:#fff!important;border-c
 }
 .proto-attachment-chip:hover{background:#fff5f8;border-color:#e9b7c5}
 
+
+.pending-overdue{border-color:#efc5c5!important;background:#fffafa!important}
+#pendingTaskSummary{margin-top:14px}
+
+
+.default-task-toolbar{display:flex;gap:16px;justify-content:space-between;align-items:end;margin:14px 0}
+.default-task-toolbar>div:first-child{min-width:220px}.default-task-note{max-width:620px;text-align:right}
+.default-task-head,.default-task-row{display:grid;grid-template-columns:80px 2.4fr 1.2fr 1fr 170px;gap:10px;align-items:center}
+.default-task-head{padding:10px 12px;border-bottom:1px solid var(--line);background:#f6f8fb;border-radius:10px 10px 0 0;font-size:12px;font-weight:800;color:var(--muted);text-transform:uppercase}
+.default-task-row{padding:11px 12px;border-bottom:1px solid var(--line)}.default-task-order{font-weight:800}
+@media(max-width:800px){.default-task-head{display:none}.default-task-row{grid-template-columns:1fr}.default-task-note{text-align:left}.default-task-toolbar{align-items:stretch;flex-direction:column}}
+
 </style>
-<!-- WOW_BEAUTY_GITHUB_RELEASE_V8_1_LOGIN_PRODUCTION_MODULE_FIX: integrated production modules + new Dashboard/My Task/Workflow -->
+<!-- WOW_BEAUTY_GITHUB_RELEASE_V8_3_DEFAULT_TASK_TEMPLATE_ADMIN: integrated production modules + new Dashboard/My Task/Workflow -->
 </head>
 <body>
 <section id="loginScreen" class="login-screen">
@@ -750,11 +762,23 @@ button.confirm-delete{background:#b42318!important;color:#fff!important;border-c
 <section id="page-approvals" class="hidden">
   <div class="toolbar">
     <div>
-      <h1>My Tasks</h1>
-      <div class="sub">Start your assigned tasks, submit updates multiple times, and keep the full submission history.</div>
+      <h1>Pending Task</h1>
+      <div class="sub">Live action queue synced with My Task and Workflow.</div>
     </div>
+    <select id="pendingTaskProject" onchange="renderPendingTasks()"></select>
   </div>
-  <div id="protoMyTasks"></div>
+
+  <div id="pendingTaskSummary" class="proto-summary"></div>
+
+  <div class="card panel" style="margin-top:14px">
+    <div class="section-title-row">
+      <div>
+        <h2 id="pendingTaskListTitle">Tasks Requiring Action</h2>
+        <div class="small" id="pendingTaskListSub">Only tasks from the current task workflow are shown here.</div>
+      </div>
+    </div>
+    <div id="approvalActionList"></div>
+  </div>
 </section>
 
 
@@ -816,10 +840,23 @@ button.confirm-delete{background:#b42318!important;color:#fff!important;border-c
     <button class="tab active" onclick="adminTab('departments',this)">Departments</button>
     <button class="tab" onclick="adminTab('roles',this)">Roles & Permissions</button>
     <button class="tab" onclick="adminTab('users',this)">Users</button>
+    <button class="tab" onclick="adminTab('defaulttasks',this)">Default Task List</button>
   </div>
   <div id="admin-departments" class="card panel"><div class="toolbar"><h2>Departments</h2><button class="primary" onclick="openDepartment()">+ Add Department</button></div><table><thead><tr><th>Department</th><th>Code</th><th>Status</th><th>Actions</th></tr></thead><tbody id="departmentRows"></tbody></table></div>
   <div id="admin-roles" class="card panel hidden"><div class="toolbar"><h2>Roles & Permissions</h2><button class="primary" onclick="openRole()">+ Add Role</button></div><table><thead><tr><th>Role</th><th>Permissions</th><th>Actions</th></tr></thead><tbody id="roleRows"></tbody></table></div>
   <div id="admin-users" class="card panel hidden"><div class="toolbar"><div><h2>Users</h2><div class="small">Synced from Supabase profiles. Account creation/editing is temporarily managed in Supabase.</div></div></div><table><thead><tr><th>Name</th><th>Email</th><th>Department</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead><tbody id="userRows"></tbody></table></div>
+  <div id="admin-defaulttasks" class="card panel hidden">
+    <div class="toolbar">
+      <div><h2>Default Task List</h2><div class="small">Super Admin controls the task template automatically generated for every new project.</div></div>
+      <button class="primary" onclick="openDefaultTaskEditor()">+ Add Default Task</button>
+    </div>
+    <div class="default-task-toolbar">
+      <div><label>Department</label><select id="defaultTaskDeptFilter" onchange="renderDefaultTaskList()"></select></div>
+      <div class="small default-task-note">Changes apply to newly created projects only. Existing project task history will not be overwritten.</div>
+    </div>
+    <div class="default-task-head"><div>Order</div><div>Task Name</div><div>Department</div><div>Priority</div><div>Action</div></div>
+    <div id="defaultTaskRows"></div>
+  </div>
 </section>
 
 
@@ -1203,9 +1240,15 @@ function page(id,el){
  if(id==='payments')renderCentralPayments();
  if(id==='tasks')renderProtoTasks();
  if(id==='workflow')renderProtoWorkflow();
- if(id==='approvals')renderApprovals();
+ if(id==='approvals')renderPendingTasks();
 }
-function adminTab(id,el){document.querySelectorAll('[id^="admin-"]').forEach(x=>x.classList.add('hidden'));$('admin-'+id).classList.remove('hidden');document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));el.classList.add('active')}
+function adminTab(id,el){
+ document.querySelectorAll('[id^="admin-"]').forEach(x=>x.classList.add('hidden'));
+ const panel=$('admin-'+id);if(panel)panel.classList.remove('hidden');
+ document.querySelectorAll('#page-admin .tabs .tab').forEach(x=>x.classList.remove('active'));
+ if(el)el.classList.add('active');
+ if(id==='defaulttasks')renderDefaultTaskList();
+}
 function openM(id){const el=$(id);if(!el)return;el.classList.remove('hidden');el.style.display='grid'}function closeM(id){const el=$(id);if(!el)return;el.classList.add('hidden');el.style.display=''}
 
 function activeUsers(){return users.filter(u=>u.status==='Active')}
@@ -2818,31 +2861,134 @@ function canCurrentUserApproveWorkflow(w){
  return currentUser.dept===dept;
 }
 
+function pendingTaskProjectOptions(){
+ const sel=$('pendingTaskProject');
+ if(!sel)return;
+ const old=sel.value;
+ sel.innerHTML='<option value="ALL">All Projects</option>'+projects.map(p=>`<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('');
+ if(old && [...sel.options].some(o=>o.value===old))sel.value=old;
+}
+
+function pendingTaskVisibleItems(){
+ projects.forEach(p=>protoSeedProject(p.id));
+ const projectFilter=$('pendingTaskProject')?.value||'ALL';
+ let items=projects.flatMap(p=>protoAllTasks(p.id).map(t=>({project:p,task:t})));
+
+ if(projectFilter!=='ALL'){
+   items=items.filter(x=>String(x.project.id)===String(projectFilter));
+ }
+
+ const isManagement=dashboardIsManagement();
+ const isSuper=dashboardIsSuperAdmin();
+ const dept=currentUser?.dept||currentUser?.department||'';
+
+ if(isManagement){
+   // Management's key pending responsibility is reviewing submitted tasks,
+   // plus Management department tasks that are still open.
+   return items.filter(x =>
+     x.task.status==='Submitted' ||
+     (x.task.dept==='Management' && ['Not Started','In Progress'].includes(x.task.status))
+   );
+ }
+
+ if(isSuper){
+   // Super Admin monitors every task that is not completed.
+   return items.filter(x=>x.task.status!=='Completed');
+ }
+
+ // Normal department users only see their own department's actionable tasks.
+ return items.filter(x =>
+   x.task.dept===dept &&
+   ['Not Started','In Progress'].includes(x.task.status)
+ );
+}
+
 function renderPendingTasks(){
- const root=$('approvalActionList'); if(!root)return;
- const items=projects.map(p=>({project:p,task:currentPendingTask(p)}))
-   .filter(x=>x.task && (currentUser?.role==='Super Admin'||x.task.pic===currentUser?.name));
- root.innerHTML=items.map(({project,task})=>{
-   const m=taskMission(project,task)||ensureTaskMission(project,task,'Pending');
-   const prev=previousTaskForProject(project,task);
-   const latest=missionEvents(m).slice(-1)[0];
-   return `<div class="pending-task-card">
-     <div class="section-title-row">
-       <div><h3 style="margin:0">${escapeHtml(project.name)} · ${escapeHtml(task.name)}</h3>
-       <div class="small" style="margin-top:4px">Department: ${escapeHtml(task.dept||'—')} · PIC: ${escapeHtml(task.pic||'—')} · Sequence ${task.seq}</div></div>
-       ${statusPill('Pending')}
+ const root=$('approvalActionList');
+ if(!root)return;
+
+ pendingTaskProjectOptions();
+ const items=pendingTaskVisibleItems();
+ const isManagement=dashboardIsManagement();
+ const isSuper=dashboardIsSuperAdmin();
+
+ const notStarted=items.filter(x=>x.task.status==='Not Started').length;
+ const inProgress=items.filter(x=>x.task.status==='In Progress').length;
+ const submitted=items.filter(x=>x.task.status==='Submitted').length;
+ const overdue=items.filter(x=>dashboardIsOverdue(x.task)).length;
+
+ if($('pendingTaskSummary')){
+   $('pendingTaskSummary').innerHTML=`
+     <div class="proto-summary-card"><span>Pending</span><b>${items.length}</b></div>
+     <div class="proto-summary-card"><span>Not Started</span><b>${notStarted}</b></div>
+     <div class="proto-summary-card"><span>In Progress</span><b>${inProgress}</b></div>
+     <div class="proto-summary-card"><span>Submitted</span><b>${submitted}</b></div>
+     <div class="proto-summary-card"><span>Overdue</span><b>${overdue}</b></div>`;
+ }
+
+ if($('pendingTaskListTitle')){
+   $('pendingTaskListTitle').textContent=isManagement
+     ? 'Management Pending Queue'
+     : (isSuper?'All Outstanding Tasks':'My Department Pending Tasks');
+ }
+ if($('pendingTaskListSub')){
+   $('pendingTaskListSub').textContent=isManagement
+     ? 'Submitted tasks are waiting for Management confirmation. Open Management tasks are also shown.'
+     : (isSuper
+       ? 'Super Admin can monitor all outstanding tasks across departments.'
+       : `Not Started and In Progress tasks for ${currentUser?.dept||'your department'}.`);
+ }
+
+ items.sort((a,b)=>{
+   const ao=dashboardIsOverdue(a.task),bo=dashboardIsOverdue(b.task);
+   if(ao!==bo)return ao?-1:1;
+   const order={'Submitted':0,'In Progress':1,'Not Started':2};
+   return (order[a.task.status]??9)-(order[b.task.status]??9);
+ });
+
+ root.innerHTML=items.map(({project,task:t})=>{
+   const overdue=dashboardIsOverdue(t);
+   const last=(t.submissions||[])[(t.submissions||[]).length-1];
+   const canWork=protoCanWork(t);
+   const canComplete=isManagement && t.status==='Submitted';
+
+   return `<div class="dashboard-action-item ${overdue?'pending-overdue':''}">
+     <div class="dashboard-action-main">
+       <div>
+         <b>${escapeHtml(t.name)}</b>
+         <div class="small">${escapeHtml(project.name)} · ${escapeHtml(t.dept)} · Owner: ${escapeHtml(t.owner||'—')}</div>
+       </div>
+       <span class="proto-status ${protoStatusClass(t.status)}">${escapeHtml(t.status)}</span>
      </div>
-     <div class="small" style="margin-top:8px">${latest?`Latest: ${escapeHtml(latest.type)} by ${escapeHtml(latest.by)} · ${latest.at}`:'This task is ready for action.'}</div>
-     <textarea id="ptComment_${project.id}_${task.id}" placeholder="Optional comment / task update"></textarea>
-     <input id="ptFile_${project.id}_${task.id}" type="file" multiple style="margin-top:8px">
-     <div style="display:flex;gap:8px;margin-top:10px">
-       <button class="primary" onclick="submitSequentialTask(${project.id},${task.id},'inbox')">Submit</button>
-       ${prev?`<button class="secondary" onclick="returnSequentialTask(${project.id},${task.id},'inbox')">Return</button>`:''}
-       <button class="secondary" onclick="page('workflow',[...document.querySelectorAll('.nav a')].find(a=>a.textContent.includes('Workflow')));setRoadmapProject(${project.id},${task.id})">Open Workflow</button>
+
+     <div class="small" style="margin-top:7px">
+       Start: ${escapeHtml(protoDateOnly(t.startTime))} ·
+       Target: ${escapeHtml(t.targetDate||'Not set')} ·
+       Due Time: ${escapeHtml(protoElapsedDueTime(t))}
+       ${overdue?' · <b style="color:#bd4545">OVERDUE</b>':''}
+     </div>
+
+     ${last?`<div class="dashboard-review-preview">
+       <b>Latest Submission</b>
+       <div class="small">${escapeHtml(last.by||'—')} · ${escapeHtml(last.time||'—')}</div>
+       <div>${escapeHtml(last.comment||'No comment')}</div>
+       ${last.files?.length?protoAttachmentButtons(last.files):''}
+     </div>`:''}
+
+     <div class="dashboard-action-buttons">
+       ${canWork && t.status==='Not Started'?`<button class="primary" onclick="protoStartTask(${t.id})">Start</button>`:''}
+       ${canWork && t.status==='In Progress'?`<button class="primary" onclick="protoOpenSubmit(${t.id})">Submit</button>`:''}
+       ${canWork && t.status==='Submitted'?`<button class="secondary" onclick="protoOpenSubmit(${t.id})">Submit Update</button>`:''}
+       ${canComplete?`<button class="primary" onclick="protoCompleteTask(${t.id})">Review & Complete</button>`:''}
+       <button class="secondary" onclick="dashboardOpenWorkflow(${project.id})">Workflow</button>
      </div>
    </div>`;
- }).join('')||`<div class="approval-empty"><b>No Pending Task</b><div class="small" style="margin-top:5px">When the workflow reaches a task assigned to you, it will appear here automatically.</div></div>`;
+ }).join('') || `<div class="approval-empty">
+   <b>No Pending Task</b>
+   <div class="small" style="margin-top:5px">There are currently no tasks requiring action for this account.</div>
+ </div>`;
 }
+
 function renderApprovals(){renderPendingTasks();}
 function collectAttachments(id){
  const input=$('file-'+id);
@@ -3000,7 +3146,71 @@ function saveTask(){
  renderAll();
 }
 
-function renderAdmin(){renderDepartments();renderRoles();renderUsers()}
+function renderAdmin(){renderDepartments();renderRoles();renderUsers();renderDefaultTaskList()}
+
+function populateDefaultTaskDepartmentOptions(){
+ ensureDefaultTaskTemplate();
+ const active=protoActiveDepartments().map(d=>d.name);
+ const filter=$('defaultTaskDeptFilter'), editor=$('defaultTaskDept');
+ if(filter){
+   const old=filter.value;
+   filter.innerHTML='<option value="ALL">All Departments</option>'+active.map(d=>`<option value="${d}">${escapeHtml(d)}</option>`).join('');
+   if(old && [...filter.options].some(o=>o.value===old))filter.value=old;
+ }
+ if(editor){
+   const old=editor.value;
+   editor.innerHTML=active.map(d=>`<option value="${d}">${escapeHtml(d)}</option>`).join('');
+   if(old && [...editor.options].some(o=>o.value===old))editor.value=old;
+ }
+}
+function renderDefaultTaskList(){
+ if(!dashboardIsSuperAdmin())return;
+ ensureDefaultTaskTemplate(); populateDefaultTaskDepartmentOptions();
+ const root=$('defaultTaskRows'); if(!root)return;
+ const filter=$('defaultTaskDeptFilter')?.value||'ALL';
+ let rows=defaultTaskTemplate.slice();
+ if(filter!=='ALL')rows=rows.filter(t=>t.dept===filter);
+ rows.sort((a,b)=>a.dept.localeCompare(b.dept)||(a.order||0)-(b.order||0)||a.id-b.id);
+ root.innerHTML=rows.map(t=>`<div class="default-task-row">
+   <div class="default-task-order">${t.order||'—'}</div><div><b>${escapeHtml(t.name)}</b></div>
+   <div>${escapeHtml(t.dept)}</div>
+   <div><span class="badge ${t.priority==='High'?'bad':t.priority==='Low'?'ok':'plan'}">${escapeHtml(t.priority||'Medium')}</span></div>
+   <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="secondary" onclick="openDefaultTaskEditor(${t.id})">Edit</button><button class="secondary" onclick="deleteDefaultTaskTemplate(${t.id})">Delete</button></div>
+ </div>`).join('')||'<div class="small" style="padding:14px">No default tasks for this Department.</div>';
+}
+function openDefaultTaskEditor(id){
+ if(!dashboardIsSuperAdmin())return alert('Only Super Admin can edit the Default Task List.');
+ ensureDefaultTaskTemplate(); populateDefaultTaskDepartmentOptions();
+ const t=defaultTaskTemplate.find(x=>Number(x.id)===Number(id));
+ $('defaultTaskEditId').value=t?.id||'';$('defaultTaskEditorTitle').textContent=t?'Edit Default Task':'Add Default Task';
+ $('defaultTaskName').value=t?.name||'';$('defaultTaskDept').value=t?.dept||protoActiveDepartments()[0]?.name||'';
+ $('defaultTaskPriority').value=t?.priority||'Medium';
+ $('defaultTaskOrder').value=t?.order||(defaultTasksForDepartment($('defaultTaskDept').value).length+1);
+ openM('defaultTaskEditorModal');
+}
+function normalizeDefaultTaskOrders(dept){
+ const list=defaultTaskTemplate.filter(t=>t.dept===dept).sort((a,b)=>(a.order||999)-(b.order||999)||a.id-b.id);
+ list.forEach((t,i)=>t.order=i+1);
+}
+function saveDefaultTaskTemplate(){
+ if(!dashboardIsSuperAdmin())return alert('Only Super Admin can edit the Default Task List.');
+ const id=Number($('defaultTaskEditId').value||0),name=$('defaultTaskName').value.trim(),dept=$('defaultTaskDept').value;
+ const priority=$('defaultTaskPriority').value,order=Math.max(1,Number($('defaultTaskOrder').value)||1);
+ if(!name)return alert('Task name is required.'); if(!dept)return alert('Department is required.');
+ const existing=defaultTaskTemplate.find(x=>Number(x.id)===id),oldDept=existing?.dept;
+ if(existing)Object.assign(existing,{name,dept,priority,order});
+ else defaultTaskTemplate.push({id:++defaultTaskTemplateSeq,name,dept,priority,order});
+ if(oldDept&&oldDept!==dept)normalizeDefaultTaskOrders(oldDept); normalizeDefaultTaskOrders(dept);
+ closeM('defaultTaskEditorModal');renderDefaultTaskList();
+ alert('Default Task List updated. New projects will use this template.');
+}
+function deleteDefaultTaskTemplate(id){
+ if(!dashboardIsSuperAdmin())return alert('Only Super Admin can edit the Default Task List.');
+ const t=defaultTaskTemplate.find(x=>Number(x.id)===Number(id));if(!t)return;
+ if(!confirm(`Delete default task "${t.name}"?\n\nExisting project tasks will not be affected.`))return;
+ const idx=defaultTaskTemplate.findIndex(x=>Number(x.id)===Number(id));if(idx>=0)defaultTaskTemplate.splice(idx,1);
+ normalizeDefaultTaskOrders(t.dept);renderDefaultTaskList();
+}
 function renderDepartments(){$('departmentRows').innerHTML=departments.map(d=>`<tr><td>${d.name}</td><td>${d.code}</td><td>${d.status}</td><td><button class="secondary" onclick="openDepartment(${d.id})">Edit</button></td></tr>`).join('')}
 function openDepartment(id){$('deptId').value=id||'';const d=departments.find(x=>x.id===id);$('deptName').value=d?.name||'';$('deptCode').value=d?.code||'';$('deptStatus').value=d?.status||'Active';openM('deptModal')}
 function saveDepartment(){const id=+$('deptId').value;const o={id:id||Date.now(),name:$('deptName').value.trim(),code:$('deptCode').value.trim(),status:$('deptStatus').value};if(!o.name)return alert('Name required');if(id)Object.assign(departments.find(x=>x.id===id),o);else departments.push(o);closeM('deptModal');renderAll()}
@@ -3220,6 +3430,21 @@ clearLoginPassword();
   </div>
 </div>
 
+
+<div id="defaultTaskEditorModal" class="modal hidden">
+  <div class="modal-card" style="max-width:620px">
+    <div class="toolbar"><div><h2 id="defaultTaskEditorTitle">Add Default Task</h2><div class="small">Used automatically when a new Store Project is created.</div></div><button class="secondary" onclick="closeM('defaultTaskEditorModal')">Close</button></div>
+    <input type="hidden" id="defaultTaskEditId">
+    <div class="formgrid">
+      <div class="full"><label>Task Name</label><input id="defaultTaskName" placeholder="e.g. Submit store layout for mall approval"></div>
+      <div><label>Department</label><select id="defaultTaskDept"></select></div>
+      <div><label>Priority</label><select id="defaultTaskPriority"><option>High</option><option selected>Medium</option><option>Low</option></select></div>
+      <div><label>Order</label><input id="defaultTaskOrder" type="number" min="1" step="1"></div>
+    </div>
+    <div class="modal-actions-row"><button class="secondary" onclick="closeM('defaultTaskEditorModal')">Cancel</button><button class="primary" onclick="saveDefaultTaskTemplate()">Save Default Task</button></div>
+  </div>
+</div>
+
 <div id="protoTaskModal" class="modal hidden">
   <div class="modal-card">
     <div class="toolbar"><h2>Add Department Task</h2><button class="secondary" onclick="closeM('protoTaskModal')">Close</button></div>
@@ -3246,29 +3471,36 @@ function protoCurrentProjectId(selId){
 function protoProject(pid){ return projects.find(p=>Number(p.id)===Number(pid)); }
 function protoActiveDepartments(){ return departments.filter(d=>d.status==='Active'); }
 
+let defaultTaskTemplateSeq=50000;
+let defaultTaskTemplate=[];
+
+function ensureDefaultTaskTemplate(){
+ if(defaultTaskTemplate.length)return;
+ protoActiveDepartments().forEach(d=>{
+   [1,2,3,4,5].forEach((n,i)=>defaultTaskTemplate.push({
+     id:++defaultTaskTemplateSeq,dept:d.name,name:`${d.name} Task ${n}`,
+     priority:i===0?'High':i<3?'Medium':'Low',order:n
+   }));
+ });
+}
+function defaultTasksForDepartment(dept){
+ ensureDefaultTaskTemplate();
+ return defaultTaskTemplate.filter(t=>t.dept===dept).slice().sort((a,b)=>(a.order||0)-(b.order||0)||a.id-b.id);
+}
 function protoSeedProject(pid){
  pid=Number(pid); if(!pid || protoProjectTasks[pid])return;
  const p=protoProject(pid);
  const lead=p?.lead || activeUsers()[0]?.name || 'Sunny';
  const byDept={};
+ ensureDefaultTaskTemplate();
  protoActiveDepartments().forEach(d=>{
    const deptUsers=activeUsers().filter(u=>u.dept===d.name);
    const pic=deptUsers[0]?.name || lead;
-   byDept[d.name]=[1,2,3,4,5].map((n,i)=>({
-     id:++protoTaskSeq,
-     projectId:pid,
-     dept:d.name,
-     name:`${d.name} Task ${n}`,
-     owner:pic,
-     priority:i===0?'High':i<3?'Medium':'Low',
-     targetDate:'',
-     status:'Not Started',
-     startTime:'',
-     completedTime:'',
-     submissions:[],
-     comments:[],
-     editHistory:[],
-     progress:0
+   byDept[d.name]=defaultTasksForDepartment(d.name).map(def=>({
+     id:++protoTaskSeq,projectId:pid,dept:d.name,name:def.name,owner:pic,
+     priority:def.priority||'Medium',targetDate:'',status:'Not Started',
+     startTime:'',completedTime:'',submissions:[],comments:[],editHistory:[],progress:0,
+     defaultTemplateId:def.id
    }));
  });
  protoProjectTasks[pid]=byDept;
@@ -3491,6 +3723,7 @@ function renderProtoMyTasks(){
 function protoRenderAll(){
  renderProtoTasks(); renderProtoWorkflow(); renderProtoMyTasks();
  try{renderDashboard()}catch(e){}
+ try{renderPendingTasks()}catch(e){}
 }
 function protoStartTask(id){
  const t=protoTaskById(id); if(!t||!protoCanWork(t))return alert('You are not allowed to start this task.');
