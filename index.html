@@ -561,7 +561,7 @@ button.confirm-delete{background:#b42318!important;color:#fff!important;border-c
 @media(max-width:800px){.default-task-head{display:none}.default-task-row{grid-template-columns:1fr}.default-task-note{text-align:left}.default-task-toolbar{align-items:stretch;flex-direction:column}}
 
 </style>
-<!-- WOW_BEAUTY_GITHUB_RELEASE_V9_0_STORE_PAYMENT_ONLINE_SYNC: integrated production modules + new Dashboard/My Task/Workflow -->
+<!-- WOW_BEAUTY_GITHUB_RELEASE_V9_1_ACCESS_DOC_EXPORT_FIX: integrated production modules + new Dashboard/My Task/Workflow -->
 </head>
 <body>
 <section id="loginScreen" class="login-screen">
@@ -676,7 +676,7 @@ button.confirm-delete{background:#b42318!important;color:#fff!important;border-c
     <div class="dashboard-quick-actions">
       <button class="secondary" onclick="page('tasks',document.querySelector('.nav a[onclick*=tasks]'))">My Task</button>
       <button class="secondary" onclick="page('workflow',document.querySelector('.nav a[onclick*=workflow]'))">Workflow</button>
-      <span id="dashboardProjectTopControls"></span>
+      <button class="secondary" onclick="wbExportAllXlsx()">Export All XLSX</button><span id="dashboardProjectTopControls"></span>
     </div>
   </div>
 
@@ -740,7 +740,7 @@ button.confirm-delete{background:#b42318!important;color:#fff!important;border-c
     </div>
     <div class="proto-toolbar">
       <select id="protoTaskProject" onchange="renderProtoTasks()"></select>
-      <button id="addTaskBtn" class="primary" onclick="protoAddTask()">+ Add Task</button>
+      <button class="secondary" onclick="wbExportTasksCsv(false)">Export CSV</button><button class="secondary" onclick="wbExportTasksXlsx(false)">Export XLSX</button><button id="addTaskBtn" class="primary" onclick="protoAddTask()">+ Add Task</button>
     </div>
   </div>
   <div id="protoTaskSummary" class="proto-summary"></div>
@@ -753,7 +753,7 @@ button.confirm-delete{background:#b42318!important;color:#fff!important;border-c
       <h1>Workflow Summary</h1>
       <div class="sub">All departments overview. Everyone can review task status and submission history.</div>
     </div>
-    <select id="protoWorkflowProject" onchange="renderProtoWorkflow()"></select>
+    <div class="proto-toolbar"><button class="secondary" onclick="wbExportTasksCsv(true)">Export CSV</button><button class="secondary" onclick="wbExportTasksXlsx(true)">Export XLSX</button><select id="protoWorkflowProject" onchange="renderProtoWorkflow()"></select></div>
   </div>
   <div id="protoWorkflowSummary" class="proto-summary"></div>
   <div id="protoWorkflowDepartments"></div>
@@ -790,6 +790,8 @@ button.confirm-delete{background:#b42318!important;color:#fff!important;border-c
     </div>
     <div class="store-top-actions">
       <select id="paymentStoreFilter" onchange="renderCentralPayments()"></select>
+      <button class="secondary" onclick="wbExportPaymentsCsv()">Export CSV</button>
+      <button class="secondary" onclick="wbExportPaymentsXlsx()">Export XLSX</button>
       <button class="primary" onclick="addCentralPayment()">+ Add Payment</button>
     </div>
   </div>
@@ -813,7 +815,7 @@ button.confirm-delete{background:#b42318!important;color:#fff!important;border-c
       <h2>Payment List Access</h2>
       <div class="small">Super Admin can control which Departments can access the central Payment List.</div>
     </div>
-    <button class="primary" onclick="savePaymentAccessSettings()">Save Access</button>
+    <div style="text-align:right"><button id="savePaymentAccessBtn" class="primary" onclick="savePaymentAccessSettings()">Save Access</button><div id="paymentAccessSaveStatus" class="small" style="margin-top:5px"></div></div>
   </div>
   <div class="store-access-grid"><div><h3>Department Access</h3><div id="paymentAccessDepartments"></div></div></div>
   <div class="small" style="margin-top:10px">Super Admin always has access. Other users are allowed based on Department.</div>
@@ -825,7 +827,7 @@ button.confirm-delete{background:#b42318!important;color:#fff!important;border-c
       <h2>Store Information Access</h2>
       <div class="small">Super Admin can control which Departments can access Store Information.</div>
     </div>
-    <button class="primary" onclick="saveStoreAccessSettings()">Save Access</button>
+    <div style="text-align:right"><button id="saveStoreAccessBtn" class="primary" onclick="saveStoreAccessSettings()">Save Access</button><div id="storeAccessSaveStatus" class="small" style="margin-top:5px"></div></div>
   </div>
 
   <div class="store-access-grid"><div><h3>Department Access</h3><div id="storeAccessDepartments"></div></div></div>
@@ -867,7 +869,7 @@ button.confirm-delete{background:#b42318!important;color:#fff!important;border-c
       <div class="small">Store master data synced from active/new projects. Access is controlled by Super Admin in Admin Settings.</div>
     </div>
     <div class="store-top-actions">
-      <button class="primary" id="addNewStoreBtn" onclick="openAddNewStore()">+ Add New Store</button>
+      <button class="secondary" onclick="wbExportStoresCsv()">Export CSV</button><button class="secondary" onclick="wbExportStoresXlsx()">Export XLSX</button><button class="primary" id="addNewStoreBtn" onclick="openAddNewStore()">+ Add New Store</button>
       <select id="storeSelect" onchange="loadStoreForm()"></select>
       <button class="secondary" id="editStoreInfoBtn" onclick="editStoreInfo()">Edit</button>
       <button class="primary hidden" id="saveStoreInfoBtn" onclick="saveStoreInfo()">Save</button>
@@ -1031,6 +1033,7 @@ button.confirm-delete{background:#b42318!important;color:#fff!important;border-c
 </div></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script>
 const SUPABASE_URL='https://lgbbwsexntgnweynprnt.supabase.co';
 const SUPABASE_KEY='sb_publishable_SHwnSjppV052CsfpHeE7Gw_6Ip48gCS';
@@ -1371,8 +1374,12 @@ async function wbDeletePayment(id){
  if(error)throw error;
 }
 async function wbSaveSetting(key,value){
- const {error}=await supabaseClient.from('wb_app_settings').upsert({key,value},{onConflict:'key'});
+ const {error}=await supabaseClient.rpc('wb_save_app_setting',{p_key:key,p_value:value});
  if(error)throw error;
+ const {data,error:verifyError}=await supabaseClient
+   .from('wb_app_settings').select('key,value').eq('key',key).single();
+ if(verifyError)throw verifyError;
+ return data?.value||value;
 }
 async function wbUploadStoreFiles(storeId,category,files){
  const list=[...(files||[])]; if(!list.length)return [];
@@ -1484,14 +1491,27 @@ function renderPaymentAccessSettings(){
 
 async function savePaymentAccessSettings(){
  if(!dashboardIsSuperAdmin())return alert('Only Super Admin can change Payment List access.');
+ const btn=$('savePaymentAccessBtn'),status=$('paymentAccessSaveStatus');
  const before=deepClone(paymentAccessSettings);
- paymentAccessSettings.departments=departments
+ const selected=departments
    .filter(d=>$('paymentDeptAccess_'+d.name.replace(/[^a-zA-Z0-9]/g,'_'))?.checked)
    .map(d=>d.name);
+ if(btn){btn.disabled=true;btn.textContent='Saving...'}
+ if(status)status.textContent='Saving to Supabase...';
  try{
-   await wbSaveSetting('payment_access',{departments:paymentAccessSettings.departments});
-   renderAll();wbShowSyncNotice('Payment List access saved online.','success',1800);
- }catch(e){paymentAccessSettings=before;wbSyncError('Payment access sync failed',e)}
+   const saved=await wbSaveSetting('payment_access',{departments:selected});
+   paymentAccessSettings={departments:Array.isArray(saved?.departments)?saved.departments:selected};
+   renderPaymentAccessSettings();
+   if($('paymentListNav'))$('paymentListNav').classList.toggle('hidden',!paymentAccessAllowed());
+   if(status)status.textContent=`Saved online · ${paymentAccessSettings.departments.length} department(s)`;
+   wbShowSyncNotice('Payment List access saved online.','success',1800);
+ }catch(e){
+   paymentAccessSettings=before;renderPaymentAccessSettings();
+   if(status)status.textContent='Save failed — please check the error notice.';
+   wbSyncError('Payment access sync failed',e);
+ }finally{
+   if(btn){btn.disabled=false;btn.textContent='Save Access'}
+ }
 }
 
 let storeAccessSettings = {
@@ -1511,14 +1531,27 @@ function renderStoreAccessSettings(){
 
 async function saveStoreAccessSettings(){
  if(!dashboardIsSuperAdmin())return alert('Only Super Admin can change Store Information access.');
+ const btn=$('saveStoreAccessBtn'),status=$('storeAccessSaveStatus');
  const before=deepClone(storeAccessSettings);
- storeAccessSettings.departments=departments
+ const selected=departments
    .filter(d=>$('storeDeptAccess_'+d.name.replace(/[^a-zA-Z0-9]/g,'_'))?.checked)
    .map(d=>d.name);
+ if(btn){btn.disabled=true;btn.textContent='Saving...'}
+ if(status)status.textContent='Saving to Supabase...';
  try{
-   await wbSaveSetting('store_access',{departments:storeAccessSettings.departments});
-   renderAll();wbShowSyncNotice('Store Information access saved online.','success',1800);
- }catch(e){storeAccessSettings=before;wbSyncError('Store access sync failed',e)}
+   const saved=await wbSaveSetting('store_access',{departments:selected});
+   storeAccessSettings={departments:Array.isArray(saved?.departments)?saved.departments:selected};
+   renderStoreAccessSettings();
+   if($('storeInfoNav'))$('storeInfoNav').classList.toggle('hidden',!storeAccessAllowed());
+   if(status)status.textContent=`Saved online · ${storeAccessSettings.departments.length} department(s)`;
+   wbShowSyncNotice('Store Information access saved online.','success',1800);
+ }catch(e){
+   storeAccessSettings=before;renderStoreAccessSettings();
+   if(status)status.textContent='Save failed — please check the error notice.';
+   wbSyncError('Store access sync failed',e);
+ }finally{
+   if(btn){btn.disabled=false;btn.textContent='Save Access'}
+ }
 }
 
 function storeAccessAllowed(){
@@ -1812,12 +1845,18 @@ function renderStoreDocs(){
    if(dt.expiry && d.expiry){
      reminder=days<=30?`<div class="expiry-alert">${days<0?`Expired ${Math.abs(days)} day(s) ago`:`Expiry in ${days} day(s)`}</div>`:`<span class="expiry-ok">${days} day(s) remaining</span>`;
    }
+   const uploadUi=storeEditMode
+     ? `<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+          <input id="docFile_${dt.key}" type="file" multiple>
+          <button type="button" class="secondary" id="docUploadBtn_${dt.key}" onclick="uploadStoreDoc('${dt.key}')">Upload</button>
+        </div>`
+     : '';
    return `<div class="doc-row">
      <div><b>${dt.name}</b></div>
      <div><select id="docStatus_${dt.key}" ${storeEditMode?'':'disabled'}><option ${d.status==='Pending'?'selected':''}>Pending</option><option ${d.status==='Complete'?'selected':''}>Complete</option><option ${d.status==='Not Applicable'?'selected':''}>Not Applicable</option></select></div>
      <div>${dt.expiry?`<input id="docExpiry_${dt.key}" type="date" value="${d.expiry||''}" ${storeEditMode?`onchange="saveDocDraft('${dt.key}');renderStoreDocs()"`:'disabled'}>`:'<span class="small">No expiry required</span>'}</div>
      <div>${reminder}</div>
-     <div>${storeEditMode?`<input id="docFile_${dt.key}" type="file" multiple>`:''}<div class="doc-attachment">${wbStoreAttachmentHtml(d.attachments||[])}</div></div>
+     <div>${uploadUi}<div class="doc-attachment" style="margin-top:6px">${wbStoreAttachmentHtml(d.attachments||[])}</div></div>
      <div><textarea id="docComment_${dt.key}" placeholder="Enter document note / expiry action" ${storeEditMode?'':'disabled'}>${escapeHtml(d.comment||'')}</textarea></div>
    </div>`;
  }).join('');
@@ -1833,6 +1872,38 @@ function collectStoreDocFiles(key){
  const input=$('docFile_'+key);if(!input||!input.files)return [];
  return [...input.files];
 }
+async function uploadStoreDoc(key){
+ if(!storeEditMode)return alert('Click Edit before uploading documents.');
+ const pid=+$('storeSelect')?.value,s=storeInfoData[pid];
+ if(!s)return;
+ const input=$('docFile_'+key),files=[...(input?.files||[])];
+ if(!files.length)return alert('Please choose a file first.');
+ const btn=$('docUploadBtn_'+key);
+ if(btn){btn.disabled=true;btn.textContent='Uploading...'}
+ saveDocDraft(key);
+ let uploaded=[];
+ try{
+   uploaded=await wbUploadStoreFiles(pid,`docs/${key}`,files);
+   const d=s.docs[key]||(s.docs[key]={status:'Pending',expiry:'',comment:'',attachments:[]});
+   d.attachments=(d.attachments||[]).concat(uploaded);
+   await wbSaveStore({...s,id:pid});
+
+   // Keep cancel/edit snapshot aligned only for the document that was already uploaded online.
+   if(storeEditSnapshot){
+     storeEditSnapshot.docs=storeEditSnapshot.docs||{};
+     storeEditSnapshot.docs[key]=deepClone(d);
+   }
+   if(input)input.value='';
+   renderStoreDocs();
+   wbShowSyncNotice(`${uploaded.length} document attachment(s) uploaded.`, 'success', 1800);
+ }catch(e){
+   if(uploaded.length)await wbRemoveStoreFiles(uploaded.map(x=>x.path));
+   wbSyncError('Document upload failed',e);
+ }finally{
+   const b=$('docUploadBtn_'+key);if(b){b.disabled=false;b.textContent='Upload'}
+ }
+}
+
 
 function renderStoreContacts(){
  const pid=+$('storeSelect')?.value,s=storeInfoData[pid]; if(!s||!$('storeContactRows'))return;
@@ -2850,6 +2921,111 @@ async function dashboardDeleteProject(projectId){
    protoPopulateProjects();renderProtoTasks();renderProtoWorkflow();renderDashboard();renderPendingTasks();
  }catch(e){wbSyncError('Project delete failed',e)}
 }
+
+/* ===== CSV / XLSX Export ===== */
+function wbExportDateTag(){
+ const d=new Date(),p=n=>String(n).padStart(2,'0');
+ return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}`;
+}
+function wbDownloadBlob(blob,name){
+ const a=document.createElement('a');
+ a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();
+ setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000);
+}
+function wbCsvEscape(v){
+ const s=String(v??'');
+ return /[",\n\r]/.test(s)?`"${s.replace(/"/g,'""')}"`:s;
+}
+function wbExportCsvRows(rows,name){
+ if(!rows?.length)return alert('No data available to export.');
+ const headers=[...new Set(rows.flatMap(r=>Object.keys(r)))];
+ const csv='\ufeff'+[headers.map(wbCsvEscape).join(','),...rows.map(r=>headers.map(h=>wbCsvEscape(r[h])).join(','))].join('\r\n');
+ wbDownloadBlob(new Blob([csv],{type:'text/csv;charset=utf-8;'}),`${name}_${wbExportDateTag()}.csv`);
+}
+function wbExportXlsxSheets(sheets,name){
+ if(!window.XLSX)return alert('XLSX export library is still loading. Please try again in a moment.');
+ const wb=XLSX.utils.book_new();
+ Object.entries(sheets).forEach(([sheetName,rows])=>{
+   const ws=XLSX.utils.json_to_sheet(rows?.length?rows:[{Info:'No data'}]);
+   XLSX.utils.book_append_sheet(wb,ws,String(sheetName).slice(0,31));
+ });
+ XLSX.writeFile(wb,`${name}_${wbExportDateTag()}.xlsx`,{compression:true});
+}
+function wbProjectExportRows(){
+ return projects.map(p=>({
+   'Project ID':p.id,'Project / Store':p.name||'','City':p.city||'','Target Opening':p.opening||'',
+   'Progress %':dashboardProjectProgress(p),'Status':dashboardProjectStatus(p),'Project Lead':p.lead||'',
+   'Risk / Note':p.risk||''
+ }));
+}
+function wbStoreExportRows(){
+ syncStoreInfoFromProjects();
+ return allStoreRecords().map(r=>{
+   const s=storeInfoData[r.id]||{};
+   return {
+     'Store ID':r.id,'Store Code':s.code||'','Store Name':s.name||r.name||'','Source':s.source||'',
+     'Status':s.storeStatus||'','City':s.city||'','Mall':s.mallName||'','Level':s.level||'',
+     'Address':s.address||'','Manager':s.manager||'','Manager Contact':s.managerContact||'',
+     'Opening Date':s.openingDate||'','Size':s.size||'','Size Unit':s.sizeUnit||'',
+     'Store Model':s.model||'','Average Sales / Month':Number(s.avgSales||0),
+     'Base Rent / Month':Number(s.baseRent||0),'Service Charge / Month':Number(s.serviceCharge||0),
+     'GTO %':Number(s.gtoPct||0),'Other Rental':Number(s.otherRent||0),
+     'Total Rental Before Tax':Number(s.totalBefore||0),'Total Rental After Tax':Number(s.totalAfter||0),
+     'Lease Commencement':s.commencement||'','Lease Expiry':s.expiry||'',
+     'LOO Status':s.docs?.loo?.status||'','TA Status':s.docs?.ta?.status||'',
+     'Business License Status':s.docs?.license?.status||'','Insurance Status':s.docs?.insurance?.status||''
+   };
+ });
+}
+function wbPaymentExportRows(){
+ const selected=$('paymentStoreFilter')?.value||'ALL',rows=[];
+ allStoreRecords().forEach(r=>{
+   if(selected!=='ALL'&&String(r.id)!==String(selected))return;
+   const s=storeInfoData[r.id];(s?.payments||[]).filter(p=>!p._deleteOnSave).forEach(p=>rows.push({
+     'Payment ID':p.id||'','Store':s.name||r.name||'','City':s.city||'','Item':p.item||'',
+     'Amount (RM)':Number(p.amount||0),'Date':p.date||'','Status':p.status||'',
+     'Comment':p.comment||'','Attachment Count':(p.attachments||[]).length
+   }));
+ });
+ return rows;
+}
+function wbTaskExportRows(allDepartments=true){
+ const selectedId=Number((allDepartments?$('protoWorkflowProject'):$('protoTaskProject'))?.value||0);
+ let tasks=selectedId?protoAllTasks(selectedId):projects.flatMap(p=>protoAllTasks(p.id));
+ if(!allDepartments&&!dashboardIsSuperAdmin())tasks=tasks.filter(t=>t.dept===(currentUser?.dept||currentUser?.department));
+ return tasks.map(t=>{
+   const p=projects.find(x=>Number(x.id)===Number(t.projectId));
+   return {
+     'Task ID':t.id,'Project':p?.name||'','Department':t.dept||'','Task':t.name||'','Owner':t.owner||'',
+     'Priority':t.priority||'','Status':t.status||'','Start Time':t.startTime||'','Target Date':t.targetDate||'',
+     'Completed Time':t.completedTime||'','Progress %':Number(t.progress||0),
+     'Submission Count':(t.submissions||[]).length,'Comment Count':(t.comments||[]).length,
+     'Edit Count':(t.editHistory||[]).length
+   };
+ });
+}
+function wbDefaultTaskExportRows(){
+ return (defaultTaskTemplate||[]).map(t=>({
+   'Template ID':t.id,'Department':t.dept||'','Order':t.sortOrder??t.sort_order??'',
+   'Task':t.name||'','Priority':t.priority||'','Active':t.active!==false?'Yes':'No'
+ }));
+}
+function wbExportStoresCsv(){wbExportCsvRows(wbStoreExportRows(),'WOW_Beauty_Store_Information')}
+function wbExportStoresXlsx(){wbExportXlsxSheets({'Store Information':wbStoreExportRows()},'WOW_Beauty_Store_Information')}
+function wbExportPaymentsCsv(){wbExportCsvRows(wbPaymentExportRows(),'WOW_Beauty_Payment_List')}
+function wbExportPaymentsXlsx(){wbExportXlsxSheets({'Payment List':wbPaymentExportRows()},'WOW_Beauty_Payment_List')}
+function wbExportTasksCsv(all=true){wbExportCsvRows(wbTaskExportRows(all),all?'WOW_Beauty_Workflow':'WOW_Beauty_My_Tasks')}
+function wbExportTasksXlsx(all=true){wbExportXlsxSheets({[all?'Workflow':'My Tasks']:wbTaskExportRows(all)},all?'WOW_Beauty_Workflow':'WOW_Beauty_My_Tasks')}
+function wbExportAllXlsx(){
+ wbExportXlsxSheets({
+   'Projects':wbProjectExportRows(),
+   'Store Information':wbStoreExportRows(),
+   'Payment List':wbPaymentExportRows(),
+   'Tasks':wbTaskExportRows(true),
+   'Default Tasks':wbDefaultTaskExportRows()
+ },'WOW_Beauty_Full_Export');
+}
+
 function renderDashboard(){
  dashboardRenderProjectControls();
 
