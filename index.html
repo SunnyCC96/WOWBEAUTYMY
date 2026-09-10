@@ -349,7 +349,7 @@ button.confirm-delete{background:#b42318!important;color:#fff!important;border-c
   </div>
   <div id="admin-departments" class="card panel"><div class="toolbar"><h2>Departments</h2><button class="primary" onclick="openDepartment()">+ Add Department</button></div><table><thead><tr><th>Department</th><th>Code</th><th>Status</th><th>Actions</th></tr></thead><tbody id="departmentRows"></tbody></table></div>
   <div id="admin-roles" class="card panel hidden"><div class="toolbar"><h2>Roles & Permissions</h2><button class="primary" onclick="openRole()">+ Add Role</button></div><table><thead><tr><th>Role</th><th>Permissions</th><th>Actions</th></tr></thead><tbody id="roleRows"></tbody></table></div>
-  <div id="admin-users" class="card panel hidden"><div class="toolbar"><h2>Users</h2><button class="primary" onclick="openUser()">+ Add User</button></div><table><thead><tr><th>Name</th><th>Email</th><th>Department</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead><tbody id="userRows"></tbody></table></div>
+  <div id="admin-users" class="card panel hidden"><div class="toolbar"><div><h2>Users</h2><div class="small">Synced from Supabase profiles. Account creation/editing is temporarily managed in Supabase.</div></div></div><table><thead><tr><th>Name</th><th>Email</th><th>Department</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead><tbody id="userRows"></tbody></table></div>
 </section>
 
 
@@ -543,16 +543,7 @@ let roles=[
 {id:5,name:'Department User',perms:[]},
 {id:6,name:'Viewer',perms:[]}];
 
-let users=[
-{id:99,name:'System Admin',email:'admin@wowbeauty.com',dept:'Management',role:'Super Admin',status:'Active',password:'admin123'},
-{id:1,name:'Sunny',email:'sunny@wowbeauty.com',dept:'BD',role:'Project Admin',status:'Active',password:'123456'},
-{id:2,name:'Kelvin Lim',email:'kelvin@wowbeauty.com',dept:'Management',role:'Management',status:'Active',password:'123456'},
-{id:3,name:'Amy Tan',email:'amy@wowbeauty.com',dept:'Finance',role:'Department Head',status:'Active',password:'123456'},
-{id:4,name:'Jason Lee',email:'jason@wowbeauty.com',dept:'IT',role:'Department User',status:'Active',password:'123456'},
-{id:5,name:'May Wong',email:'may@wowbeauty.com',dept:'Operations',role:'Department Head',status:'Active',password:'123456'},
-{id:6,name:'Chloe Ng',email:'chloe@wowbeauty.com',dept:'Design',role:'Department Head',status:'Active',password:'123456'},
-{id:7,name:'Ryan Goh',email:'ryan@wowbeauty.com',dept:'Fit-out',role:'Department Head',status:'Active',password:'123456'},
-{id:8,name:'Evelyn Teh',email:'evelyn@wowbeauty.com',dept:'Leasing',role:'Department Head',status:'Active',password:'123456'}];
+let users=[]; // Loaded from Supabase Profile.
 
 let tasks=[
 {id:5,name:'Leasing / Agreement',dept:'Leasing',pic:'Evelyn Teh',role:'Department Head',projectScope:'ALL',seq:1,targetDays:5,status:'Active',desc:'Complete LOO / TA / tenancy documentation.'},
@@ -609,6 +600,11 @@ function clearLoginPassword(){
 }
 function refreshLogin(){ clearLoginPassword(); }
 
+async function loadUsersFromSupabase(){
+ const {data,error}=await supabaseClient.from('Profile').select('id,name,email,department,role,status').order('name',{ascending:true});
+ if(error){console.error('Unable to load users from Supabase:',error);users=currentUser?[currentUser]:[];return;}
+ users=(data||[]).map(p=>({id:p.id,name:p.name,email:p.email,dept:p.department,role:p.role,status:p.status}));
+}
 function applyLoggedInUser(u){
  currentUser=u;
  $('loginScreen').classList.add('hidden');
@@ -656,6 +652,8 @@ async function doLogin(){
      role:profile.role,
      status:profile.status
    };
+   currentUser=u;
+   await loadUsersFromSupabase();
    applyLoggedInUser(u);
  }catch(err){
    console.error('Login error:',err);
@@ -2265,19 +2263,7 @@ function renderRoles(){$('roleRows').innerHTML=roles.map(r=>`<tr><td>${r.name}</
 function openRole(id){$('roleId').value=id||'';const r=roles.find(x=>x.id===id);$('roleName').value=r?.name||'';$('permChecks').innerHTML=ALL_PERMS.map(p=>`<label class="check"><input type="checkbox" value="${p}" ${r?.perms.includes(p)?'checked':''}>${p}</label>`).join('');openM('roleModal')}
 function saveRole(){const id=+$('roleId').value,name=$('roleName').value.trim(),perms=[...$('permChecks').querySelectorAll('input:checked')].map(x=>x.value);if(!name)return alert('Role name required');if(id){let r=roles.find(x=>x.id===id);r.name=name;r.perms=perms}else roles.push({id:Date.now(),name,perms});closeM('roleModal');renderAll()}
 function renderUsers(){
- const host=$('userRows');
- if(!host)return;
- host.innerHTML=users.map(u=>`<tr>
-   <td>${escapeHtml(u.name)}</td>
-   <td>${escapeHtml(u.email)}</td>
-   <td>${escapeHtml(u.dept)}</td>
-   <td>${escapeHtml(u.role)}</td>
-   <td>${escapeHtml(u.status)}</td>
-   <td style="white-space:nowrap">
-     <button class="secondary" onclick="openUser(${u.id})">Edit</button>
-     ${u.role==='Super Admin'?'':`<button class="danger" style="margin-left:6px" onclick="deleteUser(${u.id})">Remove</button>`}
-   </td>
- </tr>`).join('');
+ $('userRows').innerHTML=users.map(u=>`<tr><td>${escapeHtml(u.name||'')}</td><td>${escapeHtml(u.email||'')}</td><td>${escapeHtml(u.dept||'')}</td><td>${escapeHtml(u.role||'')}</td><td><span class="badge ${u.status==='Active'?'ok':'bad'}">${escapeHtml(u.status||'')}</span></td><td><span class="small">Supabase synced</span></td></tr>`).join('');
 }
 function openUser(id){
  populateSelects();
