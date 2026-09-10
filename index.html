@@ -561,7 +561,7 @@ button.confirm-delete{background:#b42318!important;color:#fff!important;border-c
 @media(max-width:800px){.default-task-head{display:none}.default-task-row{grid-template-columns:1fr}.default-task-note{text-align:left}.default-task-toolbar{align-items:stretch;flex-direction:column}}
 
 </style>
-<!-- WOW_BEAUTY_GITHUB_RELEASE_V8_5_SUPABASE_ATTACHMENT_STORAGE: integrated production modules + new Dashboard/My Task/Workflow -->
+<!-- WOW_BEAUTY_GITHUB_RELEASE_V8_6_PERFORMANCE_OPTIMIZED: integrated production modules + new Dashboard/My Task/Workflow -->
 </head>
 <body>
 <section id="loginScreen" class="login-screen">
@@ -1236,12 +1236,15 @@ function page(id,el){
  target.classList.remove('hidden');
  document.querySelectorAll('.nav a').forEach(x=>x.classList.remove('active'));
  if(el)el.classList.add('active');
+
+ // Performance: render only the page the user actually opened.
  if(id==='dashboard')renderDashboard();
- if(id==='stores')renderStores();
- if(id==='payments')renderCentralPayments();
- if(id==='tasks')renderProtoTasks();
- if(id==='workflow')renderProtoWorkflow();
- if(id==='approvals')renderPendingTasks();
+ else if(id==='stores')renderStores();
+ else if(id==='payments')renderCentralPayments();
+ else if(id==='tasks')renderProtoTasks();
+ else if(id==='workflow')renderProtoWorkflow();
+ else if(id==='approvals')renderPendingTasks();
+ else if(id==='admin')renderAdmin();
 }
 function adminTab(id,el){
  document.querySelectorAll('[id^="admin-"]').forEach(x=>x.classList.add('hidden'));
@@ -2126,20 +2129,29 @@ function wbSyncError(label,err){
  alert(label+': '+(err?.message||'Unknown Supabase error'));
 }
 
+function wbVisiblePageId(){
+ const el=[...document.querySelectorAll('[id^="page-"]')].find(x=>!x.classList.contains('hidden'));
+ return el?.id?.replace(/^page-/,'')||'dashboard';
+}
+function wbRenderVisiblePage(){
+ const id=wbVisiblePageId();
+ if(id==='dashboard')renderDashboard();
+ else if(id==='stores' && storeAccessAllowed())renderStores();
+ else if(id==='payments' && paymentAccessAllowed())renderCentralPayments();
+ else if(id==='tasks')renderProtoTasks();
+ else if(id==='workflow')renderProtoWorkflow();
+ else if(id==='approvals')renderPendingTasks();
+ else if(id==='admin')renderAdmin();
+}
 function renderAll(){
  if($('paymentListNav'))$('paymentListNav').classList.toggle('hidden',!paymentAccessAllowed());
  if($('storeInfoNav'))$('storeInfoNav').classList.toggle('hidden',!storeAccessAllowed());
 
- // Keep the production modules independent. A problem in one module should not
- // prevent Store Information, Payment List or Admin from loading.
+ // Lightweight shared setup only. Heavy tables are lazy-rendered by active page.
+ try{populateSelects()}catch(e){console.warn('Select render:',e)}
  try{renderPaymentAccessSettings()}catch(e){console.warn('Payment access render:',e)}
  try{renderStoreAccessSettings()}catch(e){console.warn('Store access render:',e)}
- try{renderStores()}catch(e){console.warn('Store Information render:',e)}
- try{populateSelects()}catch(e){console.warn('Select render:',e)}
- try{renderCentralPayments()}catch(e){console.warn('Payment List render:',e)}
- try{renderAdmin()}catch(e){console.warn('Admin render:',e)}
- try{renderDashboard()}catch(e){console.warn('Dashboard render:',e)}
- try{protoRenderAll()}catch(e){console.warn('My Task / Workflow render:',e)}
+ try{wbRenderVisiblePage()}catch(e){console.warn('Active page render:',e)}
  refreshLogin();
 }
 function consumeTime(from,to){
@@ -3928,9 +3940,12 @@ function renderProtoMyTasks(){
  el.innerHTML=Object.entries(groups).map(([p,list])=>`<div class="proto-dept"><div class="proto-dept-head"><h3>${p}</h3><span class="small">${list.length} Active Task(s)</span></div>${list.map(t=>protoTaskRow(t,true,'my')).join('')}</div>`).join('') || '<div class="card panel"><div class="small">No active tasks for your department.</div></div>';
 }
 function protoRenderAll(){
- renderProtoTasks(); renderProtoWorkflow(); renderProtoMyTasks();
- try{renderDashboard()}catch(e){}
- try{renderPendingTasks()}catch(e){}
+ // Performance: task mutations refresh only the currently visible heavy module.
+ const id=wbVisiblePageId();
+ if(id==='tasks')renderProtoTasks();
+ else if(id==='workflow')renderProtoWorkflow();
+ else if(id==='approvals')renderPendingTasks();
+ else if(id==='dashboard')renderDashboard();
 }
 function protoStartTask(id){
  const t=protoTaskById(id); if(!t||!protoCanWork(t))return alert('You are not allowed to start this task.');
@@ -4180,12 +4195,13 @@ async function protoSaveNewTask(){
  }catch(e){wbSyncError('New task sync failed',e)}
 }
 document.addEventListener('change',e=>{if(e.target?.id==='protoNewTaskDept')protoRefreshPic()});
-setTimeout(()=>{try{protoPopulateProjects();protoRenderAll()}catch(e){console.warn('Prototype init',e)}},0);
-
 setInterval(()=>{
   try{
-    if($('page-tasks') && !$('page-tasks').classList.contains('hidden'))renderProtoTasks();
-    if($('page-workflow') && !$('page-workflow').classList.contains('hidden'))renderProtoWorkflow();
+    const id=wbVisiblePageId();
+    if(id==='tasks')renderProtoTasks();
+    else if(id==='workflow')renderProtoWorkflow();
+    else if(id==='approvals')renderPendingTasks();
+    else if(id==='dashboard')renderDashboard();
   }catch(e){}
 },60000);
 
