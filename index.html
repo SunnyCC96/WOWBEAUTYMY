@@ -561,7 +561,7 @@ button.confirm-delete{background:#b42318!important;color:#fff!important;border-c
 @media(max-width:800px){.default-task-head{display:none}.default-task-row{grid-template-columns:1fr}.default-task-note{text-align:left}.default-task-toolbar{align-items:stretch;flex-direction:column}}
 
 </style>
-<!-- WOW_BEAUTY_GITHUB_RELEASE_V8_7_FAST_LOGIN_ASYNC_SYNC: integrated production modules + new Dashboard/My Task/Workflow -->
+<!-- WOW_BEAUTY_GITHUB_RELEASE_V8_9_SYNC_INTEGRITY_AUDIT: integrated production modules + new Dashboard/My Task/Workflow -->
 </head>
 <body>
 <section id="loginScreen" class="login-screen">
@@ -2001,6 +2001,20 @@ async function wbUploadTaskFiles(task, fileList){
  }
  return uploaded;
 }
+
+async function wbRemoveStoragePaths(paths){
+ const clean=[...new Set((paths||[]).filter(Boolean))];
+ if(!clean.length)return;
+ const {error}=await supabaseClient.storage.from(WB_TASK_BUCKET).remove(clean);
+ if(error)console.warn('Storage cleanup:',error);
+}
+function wbTaskAttachmentPaths(t){
+ return (t?.submissions||[]).flatMap(s=>(s.files||[]).map(f=>f.path).filter(Boolean));
+}
+function wbProjectAttachmentPaths(pid){
+ return protoAllTasks(Number(pid)).flatMap(wbTaskAttachmentPaths);
+}
+
 async function wbSignedAttachmentUrl(file){
  if(file?.url && String(file.url).startsWith('blob:'))return file.url;
  if(!file?.path)return file?.url||'';
@@ -2683,8 +2697,10 @@ async function dashboardDeleteProject(projectId){
  if(!p)return alert('Project not found.');
  if(!window.confirm(`Delete project "${p.name}"?\n\nThis will remove the project and all related tasks from Supabase.`))return;
 
+ const attachmentPaths=wbProjectAttachmentPaths(pid);
  try{
    await wbDeleteProject(pid);
+   await wbRemoveStoragePaths(attachmentPaths);
    const idx=projects.findIndex(x=>Number(x.id)===pid);
    if(idx>=0)projects.splice(idx,1);
    delete protoProjectTasks[pid]; delete protoProjectTasks[String(pid)];
@@ -2946,12 +2962,14 @@ function updateProjectDeleteButton(projectId){
  btn.classList.toggle('hidden',!canDelete);
 }
 
-function deleteProject(id,confirmed=false){
+async function deleteProject(id,confirmed=false){
  const btn=$('deleteProjectModalBtn');
  try{
    if(!dashboardIsSuperAdmin())throw new Error('Only Super Admin can delete projects.');
-   const p=projects.find(x=>x.id===Number(id));
+   const pid=Number(id);
+   const p=projects.find(x=>Number(x.id)===pid);
    if(!p)throw new Error('Project not found.');
+
    if(!confirmed){
      if(btn){
        btn.dataset.confirm='1';
@@ -2961,57 +2979,69 @@ function deleteProject(id,confirmed=false){
      return;
    }
 
-   // Remove workflow / submission instances for this project.
-   for(let i=projectMissions.length-1;i>=0;i--){
-     if(projectMissions[i].project===p.name)projectMissions.splice(i,1);
-   }
-   for(let i=approvalInstances.length-1;i>=0;i--){
-     if(approvalInstances[i].project===p.name)approvalInstances.splice(i,1);
+   if(btn){
+     btn.disabled=true;
+     btn.textContent='Deleting...';
    }
 
-   // Remove project-specific task templates only.
-   for(let i=tasks.length-1;i>=0;i--){
-     if(tasks[i].projectScope===p.name)tasks.splice(i,1);
-   }
+   // IMPORTANT: delete from Supabase first.
+   // wb_project_tasks are removed automatically by ON DELETE CASCADE.
+   const attachmentPaths=wbProjectAttachmentPaths(pid);
+   await wbDeleteProject(pid);
+   await wbRemoveStoragePaths(attachmentPaths);
 
-   // Remove Store Info only when this record came from the deleted project.
-   if(storeInfoData[id] && (storeInfoData[id].source==='Project' || storeInfoData[id].projectId===Number(id))){
-     delete storeInfoData[id];
-   }
-
-   const idx=projects.findIndex(x=>x.id===Number(id));
+   // Only mutate browser state after the database delete succeeds.
+   const idx=projects.findIndex(x=>Number(x.id)===pid);
    if(idx>=0)projects.splice(idx,1);
 
-   // Close editor/detail before re-render.
-   try{closeM('projectEditorModal');}catch(e){}
-   try{closeM('projectModal');}catch(e){}
+   delete protoProjectTasks[pid];
+   delete protoProjectTasks[String(pid)];
 
-   // Refresh sections independently so one render error cannot block deletion.
-   const refreshers=[
-     ()=>renderDashboard(),
-     ()=>renderWorkflow(),
-     ()=>renderApprovals(),
-     ()=>renderTasks(),
-     ()=>renderAdmin(),
-     ()=>renderStores(),
-     ()=>populateSelects()
-   ];
-   refreshers.forEach(fn=>{try{fn();}catch(e){console.error(e);}});
+   // Clean remaining legacy/in-memory references so old UI code cannot recreate it.
+   if(typeof projectMissions!=='undefined'){
+     for(let i=projectMissions.length-1;i>=0;i--){
+       if(projectMissions[i].project===p.name)projectMissions.splice(i,1);
+     }
+   }
+   if(typeof approvalInstances!=='undefined'){
+     for(let i=approvalInstances.length-1;i>=0;i--){
+       if(approvalInstances[i].project===p.name)approvalInstances.splice(i,1);
+     }
+   }
+   if(typeof tasks!=='undefined'){
+     for(let i=tasks.length-1;i>=0;i--){
+       if(tasks[i].projectScope===p.name)tasks.splice(i,1);
+     }
+   }
+   if(typeof storeInfoData!=='undefined' && storeInfoData[pid] &&
+      (storeInfoData[pid].source==='Project' || Number(storeInfoData[pid].projectId)===pid)){
+     delete storeInfoData[pid];
+   }
+
+   try{closeM('projectEditorModal')}catch(e){}
+   try{closeM('projectModal')}catch(e){}
+
+   // Refresh current synced UI.
+   try{protoPopulateProjects()}catch(e){}
+   try{populateSelects()}catch(e){}
+   try{wbRenderVisiblePage()}catch(e){console.warn(e)}
 
    if(btn){
      btn.dataset.confirm='0';
+     btn.disabled=false;
      btn.textContent='Delete Project';
      btn.classList.remove('confirm-delete');
    }
-   alert('Project deleted.');
+   wbShowSyncNotice('Project deleted from Supabase.','success',1800);
  }catch(err){
    console.error(err);
    if(btn){
      btn.dataset.confirm='0';
+     btn.disabled=false;
      btn.textContent='Delete Project';
      btn.classList.remove('confirm-delete');
    }
-   alert(err.message||'Unable to delete project.');
+   wbSyncError('Project delete failed',err);
  }
 }
 
@@ -3021,25 +3051,30 @@ async function saveProject(){
  const obj={id:id||Date.now(),name:$('projName').value.trim(),city:$('projCity').value.trim(),opening:$('projOpening').value.trim(),progress:Math.max(0,Math.min(100,+$('projProgress').value||0)),status:$('projStatus').value,lead:$('projLead').value,risk:$('projRisk').value.trim(),ai:$('projAI').value.trim()};
  if(!obj.name)return alert('Project name is required.');
  const isNew=!id;
+ const current=id?projects.find(x=>Number(x.id)===Number(id)):null;
+ const before=current?JSON.parse(JSON.stringify(current)):null;
  try{
-   if(id){
-     const current=projects.find(x=>x.id===id);
-     if(!current)return alert('Project not found.');
-     Object.assign(current,obj);
-   }else{
-     projects.push(obj);
-   }
-
+   // Database first for edits; new projects are inserted before local state is committed.
    await wbSaveProject(obj);
+   if(current)Object.assign(current,obj); else projects.push(obj);
 
    if(isNew){
      protoSeedProject(obj.id);
-     for(const t of protoAllTasks(obj.id))await wbSaveTask(t);
+     try{
+       for(const t of protoAllTasks(obj.id))await wbSaveTask(t);
+     }catch(taskErr){
+       // Avoid a half-created project when default task creation fails.
+       await wbDeleteProject(obj.id).catch(()=>{});
+       const ix=projects.findIndex(x=>Number(x.id)===Number(obj.id));if(ix>=0)projects.splice(ix,1);
+       delete protoProjectTasks[obj.id];delete protoProjectTasks[String(obj.id)];
+       throw taskErr;
+     }
    }
-
-   closeM('projectEditorModal');
-   renderAll();
- }catch(e){wbSyncError('Project sync failed',e)}
+   closeM('projectEditorModal');renderAll();
+ }catch(e){
+   if(current&&before)Object.assign(current,before);
+   wbSyncError('Project sync failed',e);
+ }
 }
 
 let currentProjectId=null;
@@ -4060,59 +4095,39 @@ function protoOpenEditTask(id){
 async function protoSaveTaskEdit(){
  const t=protoTaskById($('protoEditTaskId').value);
  if(!t||!protoCanEdit(t))return alert('You are not allowed to edit this task.');
- const newName=$('protoEditTaskName').value.trim();
- const newTarget=$('protoEditTaskTarget').value;
+ const newName=$('protoEditTaskName').value.trim(),newTarget=$('protoEditTaskTarget').value;
  if(!newName)return alert('Task name required.');
-
  const changes=[];
  if(newName!==t.name)changes.push(`Task Name: "${t.name}" → "${newName}"`);
  if(newTarget!==(t.targetDate||''))changes.push(`Target Date: ${t.targetDate||'Blank'} → ${newTarget||'Blank'}`);
-
- if(!changes.length){
-   closeM('protoEditTaskModal');
-   return;
- }
-
+ if(!changes.length){closeM('protoEditTaskModal');return}
+ const before=JSON.parse(JSON.stringify(t));
  t.editHistory=t.editHistory||[];
- t.editHistory.push({
-   by:currentUser.name,
-   time:nowStamp(),
-   summary:changes.join(' · ')
- });
-
- t.name=newName;
- t.targetDate=newTarget;
+ t.editHistory.push({by:currentUser.name,time:nowStamp(),summary:changes.join(' · ')});
+ t.name=newName;t.targetDate=newTarget;
  try{await wbSaveTask(t);closeM('protoEditTaskModal');protoRenderAll();}
- catch(e){wbSyncError('Task edit sync failed',e)}
+ catch(e){Object.assign(t,before);wbSyncError('Task edit sync failed',e)}
 }
 async function protoAddComment(id,context='my'){
- const t=protoTaskById(id);
- if(!t||!currentUser)return;
- const input=$(`protoComment_${context}_${id}`);
- const text=input?.value.trim();
+ const t=protoTaskById(id);if(!t||!currentUser)return;
+ const input=$(`protoComment_${context}_${id}`),text=input?.value.trim();
  if(!text)return alert('Please enter a comment.');
- t.comments=t.comments||[];
- t.comments.push({
-   by:currentUser.name,
-   time:nowStamp(),
-   text
- });
- try{await wbSaveTask(t)}catch(e){return wbSyncError('Comment sync failed',e)}
- protoRenderAll();
- const detail=$(`protoHistory_${context}_${id}`);
- if(detail)detail.classList.remove('hidden');
+ const before=JSON.parse(JSON.stringify(t.comments||[]));
+ t.comments=t.comments||[];t.comments.push({by:currentUser.name,time:nowStamp(),text});
+ try{await wbSaveTask(t)}
+ catch(e){t.comments=before;return wbSyncError('Comment sync failed',e)}
+ protoRenderAll();const detail=$(`protoHistory_${context}_${id}`);if(detail)detail.classList.remove('hidden');
 }
 async function protoDeleteTask(id){
  const t=protoTaskById(id);
  if(!t||!protoCanDelete(t))return alert('You are not allowed to delete this task.');
- if(!confirm(`Delete "${t.name}"? Submission history will also be deleted.`))return;
+ if(!confirm(`Delete "${t.name}"? Submission history and stored attachments will also be deleted.`))return;
+ const paths=wbTaskAttachmentPaths(t);
  try{
    await wbDeleteTask(t.id);
    const group=protoProjectTasks[t.projectId]?.[t.dept];
-   if(group){
-     const idx=group.findIndex(x=>Number(x.id)===Number(id));
-     if(idx>=0)group.splice(idx,1);
-   }
+   if(group){const idx=group.findIndex(x=>Number(x.id)===Number(id));if(idx>=0)group.splice(idx,1)}
+   await wbRemoveStoragePaths(paths);
    protoRenderAll();
  }catch(e){wbSyncError('Task delete failed',e)}
 }
@@ -4125,20 +4140,22 @@ function protoOpenSubmit(id){
  openM('protoSubmitModal');
 }
 async function protoSaveSubmission(){
- const t=protoTaskById($('protoSubmitTaskId').value); if(!t||!protoCanWork(t))return;
+ const t=protoTaskById($('protoSubmitTaskId').value);if(!t||!protoCanWork(t))return;
  if(t.status==='Not Started')return alert('Please Start the task first.');
- const inputFiles=[...($('protoSubmitFile')?.files||[])];
- const comment=$('protoSubmitComment').value.trim();
- const previousStatus=t.status,previousProgress=t.progress;
+ const inputFiles=[...($('protoSubmitFile')?.files||[])],comment=$('protoSubmitComment').value.trim();
+ const before=JSON.parse(JSON.stringify(t));
+ let files=[];
  try{
-   const files=await wbUploadTaskFiles(t,inputFiles);
+   files=await wbUploadTaskFiles(t,inputFiles);
    t.submissions=t.submissions||[];
    t.submissions.push({id:wbNewId(),by:currentUser.name,time:nowStamp(),comment,files});
    t.status='Submitted';t.progress=80;
    await wbSaveTask(t);
    closeM('protoSubmitModal');protoRenderAll();
  }catch(e){
-   t.status=previousStatus;t.progress=previousProgress;
+   Object.assign(t,before);
+   // If DB save fails after upload, remove newly uploaded files to avoid orphan storage objects.
+   await wbRemoveStoragePaths(files.map(f=>f.path));
    wbSyncError('Submission / attachment sync failed',e);
  }
 }
@@ -4183,19 +4200,13 @@ async function protoConfirmCompleteTask(){
  const t=protoTaskById($('protoCompleteTaskId').value);
  if(!t||!protoCanComplete())return alert('Only Management department can confirm completion.');
  if(t.status!=='Submitted')return alert('Task must be Submitted before it can be completed.');
+ const before=JSON.parse(JSON.stringify(t));
  const comment=$('protoCompleteComment')?.value.trim();
- t.status='Completed';
- t.progress=100;
- t.completedTime=nowStamp();
- t.submissions.push({
-   id:wbNewId(),
-   by:currentUser.name,
-   time:nowStamp(),
-   comment:comment ? `Completion confirmed: ${comment}` : 'Completion confirmed.',
-   files:[]
- });
+ t.status='Completed';t.progress=100;t.completedTime=nowStamp();
+ t.submissions=t.submissions||[];
+ t.submissions.push({id:wbNewId(),by:currentUser.name,time:nowStamp(),comment:comment?`Completion confirmed: ${comment}`:'Completion confirmed.',files:[]});
  try{await wbSaveTask(t);closeM('protoCompleteModal');protoRenderAll();}
- catch(e){wbSyncError('Completion sync failed',e)}
+ catch(e){Object.assign(t,before);wbSyncError('Completion sync failed',e)}
 }
 function protoToggleHistory(id,context='my'){
  const el=$(`protoHistory_${context}_${id}`);
