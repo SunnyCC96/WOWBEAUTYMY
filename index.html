@@ -561,7 +561,7 @@ button.confirm-delete{background:#b42318!important;color:#fff!important;border-c
 @media(max-width:800px){.default-task-head{display:none}.default-task-row{grid-template-columns:1fr}.default-task-note{text-align:left}.default-task-toolbar{align-items:stretch;flex-direction:column}}
 
 </style>
-<!-- WOW_BEAUTY_GITHUB_RELEASE_V8_6_PERFORMANCE_OPTIMIZED: integrated production modules + new Dashboard/My Task/Workflow -->
+<!-- WOW_BEAUTY_GITHUB_RELEASE_V8_7_FAST_LOGIN_ASYNC_SYNC: integrated production modules + new Dashboard/My Task/Workflow -->
 </head>
 <body>
 <section id="loginScreen" class="login-screen">
@@ -1173,50 +1173,91 @@ async function forgotPassword(e){
 }
 initLoginCover();
 
+
+function wbEnsureSyncNotice(){
+ let el=$('wbSyncNotice');
+ if(el)return el;
+ el=document.createElement('div');
+ el.id='wbSyncNotice';
+ el.style.cssText='position:fixed;right:22px;bottom:22px;z-index:99999;padding:10px 14px;border-radius:12px;background:#fff;color:#333;box-shadow:0 8px 28px rgba(0,0,0,.16);font-size:13px;display:none;max-width:320px';
+ document.body.appendChild(el);
+ return el;
+}
+function wbShowSyncNotice(text,type='info',hideAfter=0){
+ const el=wbEnsureSyncNotice();
+ el.textContent=text;
+ el.style.display='block';
+ el.style.border='1px solid '+(type==='error'?'#f0a7b7':type==='success'?'#a8dfbf':'#e5d7dd');
+ if(hideAfter)setTimeout(()=>{if(el.textContent===text)el.style.display='none'},hideAfter);
+}
+function wbSetDataLoading(on,text='Syncing workspace data…'){
+ if(on)wbShowSyncNotice(text,'info');
+ else{
+   const el=$('wbSyncNotice');
+   if(el)el.style.display='none';
+ }
+}
+
 async function doLogin(){
  const email=$('loginEmail').value.trim();
  const password=$('loginPw').value;
- if(!email||!password)return alert('Please enter email and password.');
+ const btn=$('loginBtn');
+ const err=$('loginErr');
+ if(err){err.textContent='';err.classList.add('hidden')}
+ if(!email||!password){if(err){err.textContent='Please enter email and password.';err.classList.remove('hidden')}return}
 
- const btn=document.querySelector('#loginScreen .wb-login-btn');
- if(btn){btn.disabled=true;btn.textContent='Signing in...';}
-
+ if(btn){btn.disabled=true;btn.textContent='Signing in...'}
  try{
    const {data,error}=await supabaseClient.auth.signInWithPassword({email,password});
    if(error)throw error;
 
+   // Fetch only the signed-in user's Profile before opening the app.
+   const uid=data?.user?.id;
    const {data:profile,error:profileError}=await supabaseClient
      .from('Profile')
      .select('id,name,email,department,role,status')
-     .eq('id',data.user.id)
+     .eq('id',uid)
      .single();
-
    if(profileError)throw profileError;
-   if(!profile || profile.status!=='Active'){
-     await supabaseClient.auth.signOut();
-     throw new Error('This account is inactive or has no active profile.');
-   }
+   if(profile?.status!=='Active')throw new Error('This account is inactive.');
 
    const u={
      id:profile.id,
-     name:profile.name,
-     email:profile.email || email,
-     dept:profile.department,
-     role:profile.role,
-     status:profile.status
+     name:profile.name||profile.email,
+     email:profile.email||email,
+     dept:profile.department||'',
+     department:profile.department||'',
+     role:profile.role||'User',
+     status:profile.status||'Active'
    };
-   currentUser=u;
-   if($('loginRemember')?.checked)localStorage.setItem('wowBeautyLoginEmail',email);
-   else localStorage.removeItem('wowBeautyLoginEmail');
-   await loadUsersFromSupabase();
-   await loadCoreDataFromSupabase();
+
+   if($('rememberMe')?.checked)localStorage.setItem('wowRememberEmail',email);
+   else localStorage.removeItem('wowRememberEmail');
+
+   // Enter immediately after Auth + own Profile. Heavy shared data loads afterward.
    applyLoggedInUser(u);
- }catch(err){
-   console.error('Login error:',err);
-   alert('Login failed: '+(err?.message||'Unknown error'));
-   clearLoginPassword();
+   wbSetDataLoading(true,'Syncing workspace data…');
+
+   // Users and core workspace data are independent after current profile is known.
+   Promise.allSettled([
+     loadUsersFromSupabase(),
+     loadCoreDataFromSupabase()
+   ]).then(results=>{
+     const failed=results.filter(x=>x.status==='rejected');
+     wbSetDataLoading(false);
+     if(failed.length){
+       console.error('Background data sync failed:',failed);
+       wbShowSyncNotice('Some workspace data could not be loaded.','error');
+     }else{
+       wbShowSyncNotice('Workspace synced.','success',1800);
+       wbRenderVisiblePage();
+     }
+   });
+ }catch(e){
+   console.error(e);
+   if(err){err.textContent='Login failed: '+(e?.message||e);err.classList.remove('hidden')}
  }finally{
-   if(btn){btn.disabled=false;btn.textContent='Login';}
+   if(btn){btn.disabled=false;btn.textContent='Login'}
  }
 }
 
