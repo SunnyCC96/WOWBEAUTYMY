@@ -561,7 +561,7 @@ button.confirm-delete{background:#b42318!important;color:#fff!important;border-c
 @media(max-width:800px){.default-task-head{display:none}.default-task-row{grid-template-columns:1fr}.default-task-note{text-align:left}.default-task-toolbar{align-items:stretch;flex-direction:column}}
 
 </style>
-<!-- WOW_BEAUTY_GITHUB_RELEASE_V8_4_SUPABASE_CORE_SYNC: integrated production modules + new Dashboard/My Task/Workflow -->
+<!-- WOW_BEAUTY_GITHUB_RELEASE_V8_5_SUPABASE_ATTACHMENT_STORAGE: integrated production modules + new Dashboard/My Task/Workflow -->
 </head>
 <body>
 <section id="loginScreen" class="login-screen">
@@ -1937,6 +1937,41 @@ function wbNewId(){
  wbIdCounter=(wbIdCounter+1)%1000;
  return Date.now()*1000+wbIdCounter;
 }
+
+const WB_TASK_BUCKET='task-attachments';
+
+function wbSafeFileName(name){
+ return String(name||'file').replace(/[^a-zA-Z0-9._-]+/g,'_').slice(-120);
+}
+async function wbUploadTaskFiles(task, fileList){
+ const files=[...(fileList||[])];
+ if(!files.length)return [];
+ const uploaded=[];
+ for(const f of files){
+   const path=`${task.projectId}/${task.id}/${Date.now()}_${Math.random().toString(36).slice(2,8)}_${wbSafeFileName(f.name)}`;
+   const {error}=await supabaseClient.storage.from(WB_TASK_BUCKET).upload(path,f,{
+     cacheControl:'3600',upsert:false,contentType:f.type||undefined
+   });
+   if(error)throw error;
+   uploaded.push({name:f.name,size:f.size,type:f.type||'',path});
+ }
+ return uploaded;
+}
+async function wbSignedAttachmentUrl(file){
+ if(file?.url && String(file.url).startsWith('blob:'))return file.url;
+ if(!file?.path)return file?.url||'';
+ const {data,error}=await supabaseClient.storage.from(WB_TASK_BUCKET).createSignedUrl(file.path,3600);
+ if(error)throw error;
+ return data?.signedUrl||'';
+}
+async function wbOpenStoredAttachment(path,name,type){
+ try{
+   const url=await wbSignedAttachmentUrl({path});
+   if(!url)return alert('Attachment URL is unavailable.');
+   protoPreviewAttachment(url,name,type);
+ }catch(e){wbSyncError('Attachment preview failed',e)}
+}
+
 function wbProjectRow(p){
  return {
    id:Number(p.id), name:p.name||'', city:p.city||'', opening:p.opening||'',
@@ -3924,10 +3959,13 @@ function protoAttachmentButtons(files){
  if(!files?.length)return '';
  return `<div class="proto-attachment-list">${files.map((f,i)=>{
    const label=escapeHtml(f.name||`Attachment ${i+1}`);
+   if(f.path){
+     return `<button type="button" class="proto-attachment-chip" onclick="wbOpenStoredAttachment('${protoEscapeAttr(f.path)}','${protoEscapeAttr(f.name)}','${protoEscapeAttr(f.type)}')">Preview · ${label}</button>`;
+   }
    if(f.url){
      return `<button type="button" class="proto-attachment-chip" onclick="protoPreviewAttachment('${protoEscapeAttr(f.url)}','${protoEscapeAttr(f.name)}','${protoEscapeAttr(f.type)}')">Preview · ${label}</button>`;
    }
-   return `<span class="proto-attachment-chip" title="This older prototype attachment has no retained file data">${label} · Preview unavailable</span>`;
+   return `<span class="proto-attachment-chip" title="This older attachment was created before Supabase Storage was enabled">${label} · Preview unavailable</span>`;
  }).join('')}</div>`;
 }
 function protoPreviewAttachment(url,name,type){
@@ -4033,12 +4071,20 @@ function protoOpenSubmit(id){
 async function protoSaveSubmission(){
  const t=protoTaskById($('protoSubmitTaskId').value); if(!t||!protoCanWork(t))return;
  if(t.status==='Not Started')return alert('Please Start the task first.');
- const files=[...($('protoSubmitFile')?.files||[])].map(f=>({name:f.name,size:f.size,type:f.type}));
- t.submissions=t.submissions||[];
- t.submissions.push({id:wbNewId(),by:currentUser.name,time:nowStamp(),comment:$('protoSubmitComment').value.trim(),files});
- t.status='Submitted';t.progress=80;
- try{await wbSaveTask(t);closeM('protoSubmitModal');protoRenderAll();}
- catch(e){wbSyncError('Submission sync failed',e)}
+ const inputFiles=[...($('protoSubmitFile')?.files||[])];
+ const comment=$('protoSubmitComment').value.trim();
+ const previousStatus=t.status,previousProgress=t.progress;
+ try{
+   const files=await wbUploadTaskFiles(t,inputFiles);
+   t.submissions=t.submissions||[];
+   t.submissions.push({id:wbNewId(),by:currentUser.name,time:nowStamp(),comment,files});
+   t.status='Submitted';t.progress=80;
+   await wbSaveTask(t);
+   closeM('protoSubmitModal');protoRenderAll();
+ }catch(e){
+   t.status=previousStatus;t.progress=previousProgress;
+   wbSyncError('Submission / attachment sync failed',e);
+ }
 }
 function protoCompleteTask(id){
  const t=protoTaskById(id);
