@@ -561,7 +561,7 @@ button.confirm-delete{background:#b42318!important;color:#fff!important;border-c
 @media(max-width:800px){.default-task-head{display:none}.default-task-row{grid-template-columns:1fr}.default-task-note{text-align:left}.default-task-toolbar{align-items:stretch;flex-direction:column}}
 
 </style>
-<!-- WOW_BEAUTY_GITHUB_RELEASE_V9_1_ACCESS_DOC_EXPORT_FIX: integrated production modules + new Dashboard/My Task/Workflow -->
+<!-- WOW_BEAUTY_GITHUB_RELEASE_V9_2_PAYMENT_ACCESS_DOC_UPLOAD_FIX: integrated production modules + new Dashboard/My Task/Workflow -->
 </head>
 <body>
 <section id="loginScreen" class="login-screen">
@@ -1845,9 +1845,10 @@ function renderStoreDocs(){
    if(dt.expiry && d.expiry){
      reminder=days<=30?`<div class="expiry-alert">${days<0?`Expired ${Math.abs(days)} day(s) ago`:`Expiry in ${days} day(s)`}</div>`:`<span class="expiry-ok">${days} day(s) remaining</span>`;
    }
-   const uploadUi=storeEditMode
+   // Upload is an independent document action; it no longer requires Store Edit mode.
+   const uploadUi=storeAccessAllowed()
      ? `<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-          <input id="docFile_${dt.key}" type="file" multiple>
+          <input id="docFile_${dt.key}" type="file" multiple style="max-width:220px">
           <button type="button" class="secondary" id="docUploadBtn_${dt.key}" onclick="uploadStoreDoc('${dt.key}')">Upload</button>
         </div>`
      : '';
@@ -1873,22 +1874,21 @@ function collectStoreDocFiles(key){
  return [...input.files];
 }
 async function uploadStoreDoc(key){
- if(!storeEditMode)return alert('Click Edit before uploading documents.');
+ if(!storeAccessAllowed())return alert('You do not have access to Store Information.');
  const pid=+$('storeSelect')?.value,s=storeInfoData[pid];
  if(!s)return;
  const input=$('docFile_'+key),files=[...(input?.files||[])];
  if(!files.length)return alert('Please choose a file first.');
  const btn=$('docUploadBtn_'+key);
  if(btn){btn.disabled=true;btn.textContent='Uploading...'}
- saveDocDraft(key);
+ // Only pull editable draft fields when the form is actually in Edit mode.
+ if(storeEditMode)saveDocDraft(key);
  let uploaded=[];
  try{
    uploaded=await wbUploadStoreFiles(pid,`docs/${key}`,files);
    const d=s.docs[key]||(s.docs[key]={status:'Pending',expiry:'',comment:'',attachments:[]});
    d.attachments=(d.attachments||[]).concat(uploaded);
    await wbSaveStore({...s,id:pid});
-
-   // Keep cancel/edit snapshot aligned only for the document that was already uploaded online.
    if(storeEditSnapshot){
      storeEditSnapshot.docs=storeEditSnapshot.docs||{};
      storeEditSnapshot.docs[key]=deepClone(d);
