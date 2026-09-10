@@ -305,39 +305,27 @@ button.confirm-delete{background:#b42318!important;color:#fff!important;border-c
   <div class="section-title-row">
     <div>
       <h2>Payment List Access</h2>
-      <div class="small">Super Admin can control which Roles and Departments can access the central Payment List.</div>
+      <div class="small">Super Admin can control which Departments can access the central Payment List.</div>
     </div>
     <button class="primary" onclick="savePaymentAccessSettings()">Save Access</button>
   </div>
-  <div class="store-access-grid">
-    <div><h3>Role Access</h3><div id="paymentAccessRoles"></div></div>
-    <div><h3>Department Access</h3><div id="paymentAccessDepartments"></div></div>
-  </div>
-  <div class="small" style="margin-top:10px">Super Admin always has access. A user is allowed if either their Role or Department is enabled.</div>
+  <div class="store-access-grid"><div><h3>Department Access</h3><div id="paymentAccessDepartments"></div></div></div>
+  <div class="small" style="margin-top:10px">Super Admin always has access. Other users are allowed based on Department.</div>
 </div>
 
 <div class="card panel" style="margin-top:14px">
   <div class="section-title-row">
     <div>
       <h2>Store Information Access</h2>
-      <div class="small">Super Admin can control which Roles and Departments can access Store Information.</div>
+      <div class="small">Super Admin can control which Departments can access Store Information.</div>
     </div>
     <button class="primary" onclick="saveStoreAccessSettings()">Save Access</button>
   </div>
 
-  <div class="store-access-grid">
-    <div>
-      <h3>Role Access</h3>
-      <div id="storeAccessRoles"></div>
-    </div>
-    <div>
-      <h3>Department Access</h3>
-      <div id="storeAccessDepartments"></div>
-    </div>
-  </div>
+  <div class="store-access-grid"><div><h3>Department Access</h3><div id="storeAccessDepartments"></div></div></div>
 
   <div class="small" style="margin-top:10px">
-    Super Admin always has access. A user will be allowed if either their Role or Department is enabled below.
+    Super Admin always has access. Other users are allowed based on Department.
   </div>
 </div>
 
@@ -357,7 +345,7 @@ button.confirm-delete{background:#b42318!important;color:#fff!important;border-c
   <div class="toolbar">
     <div>
       <h1>Store Information</h1>
-      <div class="small">Store master data synced from active/new projects. Access: Super Admin, Management and BD only.</div>
+      <div class="small">Store master data synced from active/new projects. Access is controlled by Super Admin in Admin Settings.</div>
     </div>
     <div class="store-top-actions">
       <button class="primary" id="addNewStoreBtn" onclick="openAddNewStore()">+ Add New Store</button>
@@ -533,15 +521,22 @@ const supabaseClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const ALL_PERMS=['view_all_projects','view_all_tasks','edit_tasks','edit_workflow','approve','manage_users','manage_departments','manage_roles'];
 
 let departments=[
-{id:1,name:'Management',code:'MGMT',status:'Active'},{id:2,name:'BD',code:'BD',status:'Active'},{id:3,name:'Leasing',code:'LEAS',status:'Active'},{id:4,name:'Design',code:'DSG',status:'Active'},{id:5,name:'Fit-out',code:'FIT',status:'Active'},{id:6,name:'IT',code:'IT',status:'Active'},{id:7,name:'Operations',code:'OPS',status:'Active'},{id:8,name:'Finance',code:'FIN',status:'Active'}];
+{id:1,name:'Management',code:'MGMT',status:'Active'},
+{id:2,name:'BD',code:'BD',status:'Active'},
+{id:3,name:'Project',code:'PROJ',status:'Active'},
+{id:4,name:'HR',code:'HR',status:'Active'},
+{id:5,name:'Operations',code:'OPS',status:'Active'},
+{id:6,name:'Design',code:'DSG',status:'Active'},
+{id:7,name:'Merchandise',code:'MERCH',status:'Active'},
+{id:8,name:'Marketing',code:'MKT',status:'Active'}
+];
 
 let roles=[
 {id:1,name:'Super Admin',perms:[...ALL_PERMS]},
 {id:2,name:'Management',perms:['view_all_projects','view_all_tasks','approve']},
 {id:3,name:'Project Admin',perms:['view_all_projects','view_all_tasks','edit_tasks','edit_workflow','approve']},
-{id:4,name:'Department Head',perms:['view_all_tasks','edit_tasks','approve']},
-{id:5,name:'Department User',perms:[]},
-{id:6,name:'Viewer',perms:[]}];
+{id:4,name:'User',perms:[]}
+];
 
 let users=[]; // Loaded from Supabase Profile.
 
@@ -736,89 +731,63 @@ const storeDocTypes = [
 
 
 let paymentAccessSettings = {
-  roles: ['Project Admin'],
-  departments: []
+  departments: ['Project']
 };
 
 function paymentAccessAllowed(){
- if(!currentUser)return false;
- if(currentUser.role==='Super Admin')return true;
- return paymentAccessSettings.roles.includes(currentUser.role) || paymentAccessSettings.departments.includes(currentUser.dept);
+  if(!currentUser)return false;
+  if(currentUser.role==='Super Admin')return true;
+  return paymentAccessSettings.departments.includes(currentUser.dept);
 }
 
 function renderPaymentAccessSettings(){
- if(currentUser?.role!=='Super Admin')return;
- if($('paymentAccessRoles')){
-   $('paymentAccessRoles').innerHTML=roles
-     .filter(r=>r.name!=='Super Admin')
-     .map(r=>`<div class="store-access-item">
-       <label>${r.name}</label>
-       <input type="checkbox" id="paymentRoleAccess_${r.name.replace(/[^a-zA-Z0-9]/g,'_')}" ${paymentAccessSettings.roles.includes(r.name)?'checked':''}>
-     </div>`).join('');
- }
- if($('paymentAccessDepartments')){
-   $('paymentAccessDepartments').innerHTML=departments
-     .map(d=>`<div class="store-access-item">
-       <label>${d.name}</label>
-       <input type="checkbox" id="paymentDeptAccess_${d.name.replace(/[^a-zA-Z0-9]/g,'_')}" ${paymentAccessSettings.departments.includes(d.name)?'checked':''}>
-     </div>`).join('');
- }
+  if(currentUser?.role!=='Super Admin')return;
+  if($('paymentAccessDepartments')){
+    $('paymentAccessDepartments').innerHTML=departments
+      .map(d=>`<div class="store-access-item">
+        <label>${d.name}</label>
+        <input type="checkbox" id="paymentDeptAccess_${d.name.replace(/[^a-zA-Z0-9]/g,'_')}" ${paymentAccessSettings.departments.includes(d.name)?'checked':''}>
+      </div>`).join('');
+  }
 }
 
 function savePaymentAccessSettings(){
- if(currentUser?.role!=='Super Admin')return alert('Only Super Admin can change Payment List access.');
- paymentAccessSettings.roles=roles
-   .filter(r=>r.name!=='Super Admin')
-   .filter(r=>$('paymentRoleAccess_'+r.name.replace(/[^a-zA-Z0-9]/g,'_'))?.checked)
-   .map(r=>r.name);
- paymentAccessSettings.departments=departments
-   .filter(d=>$('paymentDeptAccess_'+d.name.replace(/[^a-zA-Z0-9]/g,'_'))?.checked)
-   .map(d=>d.name);
- renderAll();
- alert('Payment List access settings saved.');
+  if(currentUser?.role!=='Super Admin')return alert('Only Super Admin can change Payment List access.');
+  paymentAccessSettings.departments=departments
+    .filter(d=>$('paymentDeptAccess_'+d.name.replace(/[^a-zA-Z0-9]/g,'_'))?.checked)
+    .map(d=>d.name);
+  renderAll();
+  alert('Payment List access settings saved.');
 }
 
 let storeAccessSettings = {
-  roles: ['Management'],
-  departments: ['BD']
+  departments: ['BD','Project']
 };
 
 function renderStoreAccessSettings(){
- if(currentUser?.role!=='Super Admin')return;
- if($('storeAccessRoles')){
-   $('storeAccessRoles').innerHTML=roles
-     .filter(r=>r.name!=='Super Admin')
-     .map(r=>`<div class="store-access-item">
-       <label>${r.name}</label>
-       <input type="checkbox" id="storeRoleAccess_${r.name.replace(/[^a-zA-Z0-9]/g,'_')}" ${storeAccessSettings.roles.includes(r.name)?'checked':''}>
-     </div>`).join('');
- }
- if($('storeAccessDepartments')){
-   $('storeAccessDepartments').innerHTML=departments
-     .map(d=>`<div class="store-access-item">
-       <label>${d.name}</label>
-       <input type="checkbox" id="storeDeptAccess_${d.name.replace(/[^a-zA-Z0-9]/g,'_')}" ${storeAccessSettings.departments.includes(d.name)?'checked':''}>
-     </div>`).join('');
- }
+  if(currentUser?.role!=='Super Admin')return;
+  if($('storeAccessDepartments')){
+    $('storeAccessDepartments').innerHTML=departments
+      .map(d=>`<div class="store-access-item">
+        <label>${d.name}</label>
+        <input type="checkbox" id="storeDeptAccess_${d.name.replace(/[^a-zA-Z0-9]/g,'_')}" ${storeAccessSettings.departments.includes(d.name)?'checked':''}>
+      </div>`).join('');
+  }
 }
 
 function saveStoreAccessSettings(){
- if(currentUser?.role!=='Super Admin')return alert('Only Super Admin can change Store Information access.');
- storeAccessSettings.roles=roles
-   .filter(r=>r.name!=='Super Admin')
-   .filter(r=>$('storeRoleAccess_'+r.name.replace(/[^a-zA-Z0-9]/g,'_'))?.checked)
-   .map(r=>r.name);
- storeAccessSettings.departments=departments
-   .filter(d=>$('storeDeptAccess_'+d.name.replace(/[^a-zA-Z0-9]/g,'_'))?.checked)
-   .map(d=>d.name);
- renderAll();
- alert('Store Information access settings saved.');
+  if(currentUser?.role!=='Super Admin')return alert('Only Super Admin can change Store Information access.');
+  storeAccessSettings.departments=departments
+    .filter(d=>$('storeDeptAccess_'+d.name.replace(/[^a-zA-Z0-9]/g,'_'))?.checked)
+    .map(d=>d.name);
+  renderAll();
+  alert('Store Information access settings saved.');
 }
 
 function storeAccessAllowed(){
- if(!currentUser)return false;
- if(currentUser.role==='Super Admin')return true;
- return storeAccessSettings.roles.includes(currentUser.role) || storeAccessSettings.departments.includes(currentUser.dept);
+  if(!currentUser)return false;
+  if(currentUser.role==='Super Admin')return true;
+  return storeAccessSettings.departments.includes(currentUser.dept);
 }
 function activeStoreProjects(){
  return projects.filter(p=>!['Cancelled'].includes(p.status));
