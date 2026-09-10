@@ -561,7 +561,7 @@ button.confirm-delete{background:#b42318!important;color:#fff!important;border-c
 @media(max-width:800px){.default-task-head{display:none}.default-task-row{grid-template-columns:1fr}.default-task-note{text-align:left}.default-task-toolbar{align-items:stretch;flex-direction:column}}
 
 </style>
-<!-- WOW_BEAUTY_GITHUB_RELEASE_V8_9_SYNC_INTEGRITY_AUDIT: integrated production modules + new Dashboard/My Task/Workflow -->
+<!-- WOW_BEAUTY_GITHUB_RELEASE_V9_0_STORE_PAYMENT_ONLINE_SYNC: integrated production modules + new Dashboard/My Task/Workflow -->
 </head>
 <body>
 <section id="loginScreen" class="login-screen">
@@ -1241,7 +1241,7 @@ async function doLogin(){
    // Users and core workspace data are independent after current profile is known.
    Promise.allSettled([
      loadUsersFromSupabase(),
-     loadCoreDataFromSupabase()
+     loadCoreDataFromSupabase().then(()=>loadStorePaymentDataFromSupabase())
    ]).then(results=>{
      const failed=results.filter(x=>x.status==='rejected');
      wbSetDataLoading(false);
@@ -1329,6 +1329,122 @@ function toggleApproverField(){$('approverField').classList.toggle('hidden',$('w
 
 
 
+
+/* ===== V9.0 Store Information + Payment List Online Sync ===== */
+const WB_STORE_BUCKET='store-attachments';
+let wbStorePaymentLoaded=false;
+
+function wbStorePayload(s){
+ const copy=deepClone(s||{});
+ delete copy.payments;
+ return copy;
+}
+function wbStoreFromRow(r){
+ const d=r.data||{};
+ return {...d,id:Number(r.id),projectId:r.project_id==null?null:Number(r.project_id),source:r.source||d.source||'Manual',payments:[]};
+}
+function wbPaymentFromRow(r){
+ return {
+   id:Number(r.id),item:r.item||'',amount:r.amount==null?'':Number(r.amount),
+   date:r.payment_date||'',status:r.status||'Pending',comment:r.comment||'',
+   attachments:Array.isArray(r.attachments)?r.attachments:[]
+ };
+}
+async function wbSaveStore(s){
+ const row={id:Number(s.id||s.projectId),project_id:s.projectId==null?null:Number(s.projectId),source:s.source||'Manual',data:wbStorePayload(s)};
+ const {error}=await supabaseClient.from('wb_store_info').upsert(row,{onConflict:'id'});
+ if(error)throw error;
+}
+async function wbDeleteStore(id){
+ const {error}=await supabaseClient.from('wb_store_info').delete().eq('id',Number(id));
+ if(error)throw error;
+}
+async function wbSavePayment(storeId,p){
+ if(!p.id)p.id=wbNewId();
+ const row={id:Number(p.id),store_id:Number(storeId),item:p.item||'',amount:Number(p.amount||0),
+   payment_date:p.date||null,status:p.status||'Pending',comment:p.comment||'',attachments:p.attachments||[]};
+ const {error}=await supabaseClient.from('wb_payments').upsert(row,{onConflict:'id'});
+ if(error)throw error;
+}
+async function wbDeletePayment(id){
+ const {error}=await supabaseClient.from('wb_payments').delete().eq('id',Number(id));
+ if(error)throw error;
+}
+async function wbSaveSetting(key,value){
+ const {error}=await supabaseClient.from('wb_app_settings').upsert({key,value},{onConflict:'key'});
+ if(error)throw error;
+}
+async function wbUploadStoreFiles(storeId,category,files){
+ const list=[...(files||[])]; if(!list.length)return [];
+ const out=[];
+ for(const f of list){
+   const path=`${storeId}/${category}/${Date.now()}_${Math.random().toString(36).slice(2,8)}_${wbSafeFileName(f.name)}`;
+   const {error}=await supabaseClient.storage.from(WB_STORE_BUCKET).upload(path,f,{
+     cacheControl:'3600',upsert:false,contentType:f.type||undefined
+   });
+   if(error)throw error;
+   out.push({name:f.name,size:f.size,type:f.type||'',path});
+ }
+ return out;
+}
+async function wbRemoveStoreFiles(paths){
+ const clean=[...new Set((paths||[]).filter(Boolean))]; if(!clean.length)return;
+ const {error}=await supabaseClient.storage.from(WB_STORE_BUCKET).remove(clean);
+ if(error)console.warn('Store storage cleanup:',error);
+}
+async function wbOpenStoreAttachment(path,name,type){
+ try{
+   const {data,error}=await supabaseClient.storage.from(WB_STORE_BUCKET).createSignedUrl(path,3600);
+   if(error)throw error;
+   protoPreviewAttachment(data?.signedUrl||'',name,type);
+ }catch(e){wbSyncError('Attachment preview failed',e)}
+}
+function wbStoreAttachmentHtml(list){
+ const files=list||[];
+ if(!files.length)return 'No attachment uploaded';
+ return files.map(a=>{
+   const label=escapeHtml(a.name||'Attachment');
+   if(a.path)return `<button type="button" class="proto-attachment-chip" onclick="wbOpenStoreAttachment('${protoEscapeAttr(a.path)}','${protoEscapeAttr(a.name)}','${protoEscapeAttr(a.type)}')">Preview · ${label}</button>`;
+   return `<span class="proto-attachment-chip">${label} · Preview unavailable</span>`;
+ }).join('<br>');
+}
+async function loadStorePaymentDataFromSupabase(){
+ const [{data:settings,error:se},{data:stores,error:ste},{data:pays,error:pe}]=await Promise.all([
+   supabaseClient.from('wb_app_settings').select('key,value'),
+   supabaseClient.from('wb_store_info').select('*').order('id'),
+   supabaseClient.from('wb_payments').select('*').order('id')
+ ]);
+ if(se)throw se;if(ste)throw ste;if(pe)throw pe;
+
+ (settings||[]).forEach(r=>{
+   if(r.key==='payment_access'&&Array.isArray(r.value?.departments))paymentAccessSettings={departments:r.value.departments};
+   if(r.key==='store_access'&&Array.isArray(r.value?.departments))storeAccessSettings={departments:r.value.departments};
+ });
+
+ storeInfoData={};manualStores=[];
+ (stores||[]).forEach(r=>{
+   const s=wbStoreFromRow(r);storeInfoData[s.id]=s;
+   if(s.source==='Manual')manualStores.push({id:s.id,name:s.name||'',city:s.city||'',openingDate:s.openingDate||'',storeStatus:s.storeStatus||'Active'});
+ });
+ (pays||[]).forEach(r=>{
+   const sid=Number(r.store_id);
+   if(storeInfoData[sid]){
+     storeInfoData[sid].payments=storeInfoData[sid].payments||[];
+     storeInfoData[sid].payments.push(wbPaymentFromRow(r));
+   }
+ });
+
+ // First online initialization: create project-linked store records once.
+ syncStoreInfoFromProjects();
+ if(!(stores||[]).length && dashboardIsSuperAdmin()){
+   for(const p of projects){
+     const s=storeInfoData[p.id];
+     if(s)await wbSaveStore({...s,id:p.id});
+   }
+ }
+ wbStorePaymentLoaded=true;
+}
+
 let storeInfoData = {};
 let manualStores = [];
 let manualStoreSeq = 10000;
@@ -1366,13 +1482,16 @@ function renderPaymentAccessSettings(){
   }
 }
 
-function savePaymentAccessSettings(){
-  if(currentUser?.role!=='Super Admin')return alert('Only Super Admin can change Payment List access.');
-  paymentAccessSettings.departments=departments
-    .filter(d=>$('paymentDeptAccess_'+d.name.replace(/[^a-zA-Z0-9]/g,'_'))?.checked)
-    .map(d=>d.name);
-  renderAll();
-  alert('Payment List access settings saved.');
+async function savePaymentAccessSettings(){
+ if(!dashboardIsSuperAdmin())return alert('Only Super Admin can change Payment List access.');
+ const before=deepClone(paymentAccessSettings);
+ paymentAccessSettings.departments=departments
+   .filter(d=>$('paymentDeptAccess_'+d.name.replace(/[^a-zA-Z0-9]/g,'_'))?.checked)
+   .map(d=>d.name);
+ try{
+   await wbSaveSetting('payment_access',{departments:paymentAccessSettings.departments});
+   renderAll();wbShowSyncNotice('Payment List access saved online.','success',1800);
+ }catch(e){paymentAccessSettings=before;wbSyncError('Payment access sync failed',e)}
 }
 
 let storeAccessSettings = {
@@ -1390,13 +1509,16 @@ function renderStoreAccessSettings(){
   }
 }
 
-function saveStoreAccessSettings(){
-  if(currentUser?.role!=='Super Admin')return alert('Only Super Admin can change Store Information access.');
-  storeAccessSettings.departments=departments
-    .filter(d=>$('storeDeptAccess_'+d.name.replace(/[^a-zA-Z0-9]/g,'_'))?.checked)
-    .map(d=>d.name);
-  renderAll();
-  alert('Store Information access settings saved.');
+async function saveStoreAccessSettings(){
+ if(!dashboardIsSuperAdmin())return alert('Only Super Admin can change Store Information access.');
+ const before=deepClone(storeAccessSettings);
+ storeAccessSettings.departments=departments
+   .filter(d=>$('storeDeptAccess_'+d.name.replace(/[^a-zA-Z0-9]/g,'_'))?.checked)
+   .map(d=>d.name);
+ try{
+   await wbSaveSetting('store_access',{departments:storeAccessSettings.departments});
+   renderAll();wbShowSyncNotice('Store Information access saved online.','success',1800);
+ }catch(e){storeAccessSettings=before;wbSyncError('Store access sync failed',e)}
 }
 
 function storeAccessAllowed(){
@@ -1523,27 +1645,20 @@ function openAddNewStore(){
 }
 function closeAddNewStore(){ $('newStoreModal')?.classList.add('hidden'); }
 
-function createManualStore(){
+async function createManualStore(){
  if(!storeAccessAllowed())return alert('You do not have access to Store Information.');
  const name=$('newStoreName')?.value.trim();
  if(!name)return alert('Store Name is required.');
- const id=manualStoreSeq++;
- const rec={
-   id,
-   name,
-   city:$('newStoreCity')?.value.trim()||'',
-   openingDate:$('newStoreOpeningDate')?.value||'',
-   storeStatus:$('newStoreStatus')?.value||'Active'
- };
- manualStores.push(rec);
- storeInfoData[id]={
-   projectId:null, source:'Manual', storeStatus:rec.storeStatus,
-   code:$('newStoreCode')?.value.trim()||'', name, address:'', manager:'', managerContact:'',
-   openingDate:rec.openingDate, size:'', sizeUnit:'sqft', model:'Standard Store', avgSales:'',
-   level:'', city:rec.city, mallName:$('newStoreMall')?.value.trim()||'', mallCompany:'', mallBank:'', mallAccount:'',
-   contacts:[], payments:[], baseRent:'', serviceCharge:'', gtoPct:'', gtoBasis:'BASE',
-   otherType:'FIXED', otherRent:'', rentalSales:'', gtoAmount:0, gtoThreshold:0,
-   comparisonRent:0, additionalSalesRent:0, totalBefore:0,totalAfter:0,
+ const id=wbNewId();
+ const rec={id,name,city:$('newStoreCity')?.value.trim()||'',openingDate:$('newStoreOpeningDate')?.value||'',storeStatus:$('newStoreStatus')?.value||'Active'};
+ const s={
+   id,projectId:null,source:'Manual',storeStatus:rec.storeStatus,
+   code:$('newStoreCode')?.value.trim()||'',name,address:'',manager:'',managerContact:'',
+   openingDate:rec.openingDate,size:'',sizeUnit:'sqft',model:'Standard Store',avgSales:'',
+   level:'',city:rec.city,mallName:$('newStoreMall')?.value.trim()||'',mallCompany:'',mallBank:'',mallAccount:'',
+   contacts:[],payments:[],baseRent:'',serviceCharge:'',gtoPct:'',gtoBasis:'BASE',
+   otherType:'FIXED',otherRent:'',rentalSales:'',gtoAmount:0,gtoThreshold:0,
+   comparisonRent:0,additionalSalesRent:0,totalBefore:0,totalAfter:0,
    commencement:'',expiry:'',year1:'',year2:'',year3:'',
    docs:{
      loo:{status:'Pending',expiry:'',comment:'',attachments:[]},
@@ -1552,12 +1667,12 @@ function createManualStore(){
      insurance:{status:'Pending',expiry:'',comment:'',attachments:[]}
    }
  };
- closeAddNewStore();
- renderStores();
- $('storeSelect').value=String(id);
- loadStoreForm();
- editStoreInfo();
- alert('New store created. Complete the Store Information and click Save.');
+ try{
+   await wbSaveStore(s);
+   manualStores.push(rec);storeInfoData[id]=s;
+   closeAddNewStore();renderStores();$('storeSelect').value=String(id);loadStoreForm();editStoreInfo();
+   wbShowSyncNotice('New store created online.','success',1800);
+ }catch(e){wbSyncError('Create store failed',e)}
 }
 
 function loadStoreForm(){
@@ -1702,7 +1817,7 @@ function renderStoreDocs(){
      <div><select id="docStatus_${dt.key}" ${storeEditMode?'':'disabled'}><option ${d.status==='Pending'?'selected':''}>Pending</option><option ${d.status==='Complete'?'selected':''}>Complete</option><option ${d.status==='Not Applicable'?'selected':''}>Not Applicable</option></select></div>
      <div>${dt.expiry?`<input id="docExpiry_${dt.key}" type="date" value="${d.expiry||''}" ${storeEditMode?`onchange="saveDocDraft('${dt.key}');renderStoreDocs()"`:'disabled'}>`:'<span class="small">No expiry required</span>'}</div>
      <div>${reminder}</div>
-     <div>${storeEditMode?`<input id="docFile_${dt.key}" type="file" multiple>`:''}<div class="doc-attachment">${(d.attachments||[]).map(a=>`📎 ${escapeHtml(a.name)}`).join('<br>')||'No attachment uploaded'}</div></div>
+     <div>${storeEditMode?`<input id="docFile_${dt.key}" type="file" multiple>`:''}<div class="doc-attachment">${wbStoreAttachmentHtml(d.attachments||[])}</div></div>
      <div><textarea id="docComment_${dt.key}" placeholder="Enter document note / expiry action" ${storeEditMode?'':'disabled'}>${escapeHtml(d.comment||'')}</textarea></div>
    </div>`;
  }).join('');
@@ -1715,8 +1830,8 @@ function saveDocDraft(key){
  d.comment=$('docComment_'+key)?.value||'';
 }
 function collectStoreDocFiles(key){
- const input=$('docFile_'+key); if(!input||!input.files)return [];
- return [...input.files].map(f=>({name:f.name,size:f.size,type:f.type,url:URL.createObjectURL(f)}));
+ const input=$('docFile_'+key);if(!input||!input.files)return [];
+ return [...input.files];
 }
 
 function renderStoreContacts(){
@@ -1792,7 +1907,7 @@ function renderCentralPayments(){
        <div>${date}</div>
        <div><span class="badge ${status==='Paid'?'ok':status==='Overdue'?'bad':'warn'}">${status}</span></div>
        <div>${escapeHtml(comment)}</div>
-       <div><div class="inline-attachment">${attachments.map(a=>`📎 ${escapeHtml(a.name)}`).join('<br>')||'No attachment uploaded'}</div></div>
+       <div><div class="inline-attachment">${wbStoreAttachmentHtml(attachments)}</div></div>
        <div><button class="secondary" onclick="editCentralPayment(${p.id},${i})">Edit</button></div>
      </div>`;
    }
@@ -1803,7 +1918,7 @@ function renderCentralPayments(){
      <div><input id="cpDate_${p.id}_${i}" type="date" value="${pay.date||''}" title="Select payment / due date"></div>
      <div><select id="cpStatus_${p.id}_${i}"><option ${status==='Pending'?'selected':''}>Pending</option><option ${status==='Paid'?'selected':''}>Paid</option><option ${status==='Overdue'?'selected':''}>Overdue</option><option ${status==='Waived'?'selected':''}>Waived</option></select></div>
      <div><textarea id="cpComment_${p.id}_${i}" placeholder="Enter payment note / reference / follow-up">${escapeHtml(pay.comment||'')}</textarea></div>
-     <div><input id="cpFile_${p.id}_${i}" type="file" multiple><div class="inline-attachment">${attachments.map(a=>`📎 ${escapeHtml(a.name)}`).join('<br>')||'Upload invoice / receipt / supporting file'}</div></div>
+     <div><input id="cpFile_${p.id}_${i}" type="file" multiple><div class="inline-attachment">${attachments.length?wbStoreAttachmentHtml(attachments):'Upload invoice / receipt / supporting file'}</div></div>
      <div>
        <button class="primary" onclick="saveCentralPayment(${p.id},${i})">Save</button>
        <button class="secondary" style="margin-top:5px" onclick="cancelCentralPayment(${p.id},${i})">Cancel</button>
@@ -1827,57 +1942,67 @@ function cancelCentralPayment(pid,i){
  renderCentralPayments();
  if(+$('storeSelect')?.value===+pid)renderStorePayments();
 }
-function saveCentralPayment(pid,i){
- const s=storeInfoData[pid]; if(!s||!s.payments?.[i])return;
- const p=s.payments[i];
+async function saveCentralPayment(pid,i){
+ const s=storeInfoData[pid];if(!s||!s.payments?.[i])return;
+ const p=s.payments[i],before=deepClone(p),newUploads=[];
  p.item=$(`cpItem_${pid}_${i}`)?.value||'';
  p.amount=parseFloat($(`cpAmount_${pid}_${i}`)?.value)||0;
  p.date=$(`cpDate_${pid}_${i}`)?.value||'';
  p.status=$(`cpStatus_${pid}_${i}`)?.value||'Pending';
  p.comment=$(`cpComment_${pid}_${i}`)?.value||'';
  p.attachments=p.attachments||[];
- const inp=$(`cpFile_${pid}_${i}`);
- if(inp?.files?.length)[...inp.files].forEach(f=>p.attachments.push({name:f.name,size:f.size,type:f.type,url:URL.createObjectURL(f)}));
- delete centralPaymentEdit[`${pid}_${i}`];
- renderCentralPayments();
- if(+$('storeSelect')?.value===+pid)renderStorePayments();
+ try{
+   const inp=$(`cpFile_${pid}_${i}`);
+   if(inp?.files?.length){
+     const uploaded=await wbUploadStoreFiles(pid,`payments/${p.id||'new'}`,[...inp.files]);
+     newUploads.push(...uploaded);p.attachments.push(...uploaded);
+   }
+   await wbSavePayment(pid,p);
+   delete centralPaymentEdit[`${pid}_${i}`];
+   renderCentralPayments();if(+$('storeSelect')?.value===+pid)renderStorePayments();
+   wbShowSyncNotice('Payment saved online.','success',1500);
+ }catch(e){
+   Object.assign(p,before);await wbRemoveStoreFiles(newUploads.map(x=>x.path));
+   wbSyncError('Payment sync failed',e);
+ }
 }
-function deleteCentralPayment(pid,i){
- const s=storeInfoData[pid]; if(!s)return;
- delete centralPaymentEdit[`${pid}_${i}`];
- s.payments.splice(i,1);
- renderCentralPayments();
- if(+$('storeSelect')?.value===+pid)renderStorePayments();
+async function deleteCentralPayment(pid,i){
+ const s=storeInfoData[pid];if(!s||!s.payments?.[i])return;
+ const p=s.payments[i];
+ if(!confirm(`Delete payment "${p.item||'Untitled'}"?`))return;
+ const paths=(p.attachments||[]).map(a=>a.path).filter(Boolean);
+ try{
+   if(p.id)await wbDeletePayment(p.id);
+   s.payments.splice(i,1);delete centralPaymentEdit[`${pid}_${i}`];
+   await wbRemoveStoreFiles(paths);
+   renderCentralPayments();if(+$('storeSelect')?.value===+pid)renderStorePayments();
+ }catch(e){wbSyncError('Delete payment failed',e)}
 }
 function addCentralPayment(){
- const filter=$('paymentStoreFilter');
- let pid=filter?.value;
- if(!pid || pid==='ALL')pid=allStoreRecords()[0]?.id;
- pid=+pid;
- const s=storeInfoData[pid]; if(!s)return alert('No active store available.');
+ const filter=$('paymentStoreFilter');let pid=filter?.value;
+ if(!pid||pid==='ALL')pid=allStoreRecords()[0]?.id;pid=+pid;
+ const s=storeInfoData[pid];if(!s)return alert('No active store available.');
  s.payments=s.payments||[];
- s.payments.push({item:'',amount:'',date:'',status:'Pending',comment:'',attachments:[]});
- const idx=s.payments.length-1;
- centralPaymentEdit[`${pid}_${idx}`]=deepClone(s.payments[idx]);
- renderCentralPayments();
- if(+$('storeSelect')?.value===pid)renderStorePayments();
+ s.payments.push({id:wbNewId(),item:'',amount:'',date:'',status:'Pending',comment:'',attachments:[]});
+ const idx=s.payments.length-1;centralPaymentEdit[`${pid}_${idx}`]=deepClone(s.payments[idx]);
+ renderCentralPayments();if(+$('storeSelect')?.value===pid)renderStorePayments();
 }
 
 function renderStorePayments(){
  const pid=+$('storeSelect')?.value,s=storeInfoData[pid]; if(!s||!$('storePaymentRows'))return;
  s.payments=s.payments||[];
- $('storePaymentRows').innerHTML=s.payments.map((p,i)=>`<div class="payment-row">
+ $('storePaymentRows').innerHTML=s.payments.map((p,i)=>p._deleteOnSave?'':`<div class="payment-row">
    <div><input id="paymentItem_${i}" value="${escapeHtml(p.item||'')}" placeholder="e.g. Security Deposit / Rental / Licence" ${storeEditMode?'':'disabled'}></div>
    <div><input id="paymentAmount_${i}" type="number" step="0.01" value="${p.amount??''}" placeholder="Enter RM amount" ${storeEditMode?'':'disabled'}></div>
    <div><input id="paymentDate_${i}" type="date" value="${p.date||''}" ${storeEditMode?'':'disabled'}></div>
    <div><select id="paymentStatus_${i}" ${storeEditMode?'':'disabled'}><option ${p.status==='Pending'?'selected':''}>Pending</option><option ${p.status==='Paid'?'selected':''}>Paid</option><option ${p.status==='Overdue'?'selected':''}>Overdue</option><option ${p.status==='Waived'?'selected':''}>Waived</option></select></div>
    <div><textarea id="paymentComment_${i}" placeholder="Enter payment note / reference / follow-up" ${storeEditMode?'':'disabled'}>${escapeHtml(p.comment||'')}</textarea></div>
-   <div>${storeEditMode?`<input id="paymentFile_${i}" type="file" multiple>`:''}<div class="inline-attachment">${(p.attachments||[]).map(a=>`📎 ${escapeHtml(a.name)}`).join('<br>')||'No attachment uploaded'}</div></div>
+   <div>${storeEditMode?`<input id="paymentFile_${i}" type="file" multiple>`:''}<div class="inline-attachment">${wbStoreAttachmentHtml(p.attachments||[])}</div></div>
    <div>${storeEditMode?`<button class="secondary" onclick="deleteStorePayment(${i})">Delete</button>`:'<span class="small">Saved</span>'}</div>
  </div>`).join('') || '<div class="small" style="padding:10px">No payment records added.</div>';
 }
 function saveStorePaymentDrafts(){
- const pid=+$('storeSelect')?.value,s=storeInfoData[pid]; if(!s)return;
+ const pid=+$('storeSelect')?.value,s=storeInfoData[pid];if(!s)return;
  (s.payments||[]).forEach((p,i)=>{
    p.item=$('paymentItem_'+i)?.value||'';
    p.amount=parseFloat($('paymentAmount_'+i)?.value)||0;
@@ -1885,10 +2010,6 @@ function saveStorePaymentDrafts(){
    p.status=$('paymentStatus_'+i)?.value||'Pending';
    p.comment=$('paymentComment_'+i)?.value||'';
    p.attachments=p.attachments||[];
-   const input=$('paymentFile_'+i);
-   if(input?.files?.length){
-     [...input.files].forEach(f=>p.attachments.push({name:f.name,size:f.size,type:f.type,url:URL.createObjectURL(f)}));
-   }
  });
 }
 function addStorePayment(){
@@ -1901,47 +2022,68 @@ function addStorePayment(){
 }
 function deleteStorePayment(i){
  if(!storeEditMode)return alert('Click Edit before changing Store Information.');
- const pid=+$('storeSelect')?.value,s=storeInfoData[pid]; if(!s)return;
+ const pid=+$('storeSelect')?.value,s=storeInfoData[pid];if(!s)return;
  saveStorePaymentDrafts();
- s.payments.splice(i,1);
+ const p=s.payments?.[i];if(p)p._deleteOnSave=true;
  renderStorePayments();
 }
 
-function saveStoreInfo(){
+async function saveStoreInfo(){
  if(!storeAccessAllowed())return alert('You do not have access to Store Information.');
  if(!storeEditMode)return alert('Click Edit before making changes.');
- const pid=+$('storeSelect').value,s=storeInfoData[pid]; if(!s)return;
- const map={
-   code:'siCode',name:'siName',address:'siAddress',manager:'siManager',managerContact:'siManagerContact',
-   openingDate:'siOpeningDate',size:'siSize',sizeUnit:'siSizeUnit',model:'siModel',avgSales:'siAvgSales',
-   level:'siLevel',city:'siCity',storeStatus:'siStoreStatus',mallName:'siMallName',mallCompany:'siMallCompany',mallBank:'siMallBank',mallAccount:'siMallAccount',baseRent:'siBaseRent',serviceCharge:'siServiceCharge',gtoPct:'siGtoPct',
-   gtoBasis:'siGtoBasis',otherType:'siOtherType',otherRent:'siOtherRent',rentalSales:'siRentalSales',
-   commencement:'siCommencement',expiry:'siExpiry',year1:'siYear1',year2:'siYear2',year3:'siYear3'
- };
- Object.entries(map).forEach(([k,id])=>s[k]=$(id)?.value??'');
- calcStoreRental(true);
- saveStoreContactDrafts();
- saveStorePaymentDrafts();
- storeDocTypes.forEach(dt=>{
-   saveDocDraft(dt.key);
-   const files=collectStoreDocFiles(dt.key);
-   if(files.length)s.docs[dt.key].attachments=(s.docs[dt.key].attachments||[]).concat(files);
- });
- const ms=manualStores.find(x=>x.id===pid);
- if(ms){
-   ms.name=s.name;
-   ms.city=s.city;
-   ms.openingDate=s.openingDate;
-   ms.storeStatus=s.storeStatus||ms.storeStatus||'Active';
+ const pid=+$('storeSelect').value,s=storeInfoData[pid];if(!s)return;
+ const before=storeEditSnapshot?deepClone(storeEditSnapshot):deepClone(s);
+ const uploadedNow=[];
+ try{
+   const map={
+     code:'siCode',name:'siName',address:'siAddress',manager:'siManager',managerContact:'siManagerContact',
+     openingDate:'siOpeningDate',size:'siSize',sizeUnit:'siSizeUnit',model:'siModel',avgSales:'siAvgSales',
+     level:'siLevel',city:'siCity',storeStatus:'siStoreStatus',mallName:'siMallName',mallCompany:'siMallCompany',
+     mallBank:'siMallBank',mallAccount:'siMallAccount',baseRent:'siBaseRent',serviceCharge:'siServiceCharge',
+     gtoPct:'siGtoPct',gtoBasis:'siGtoBasis',otherType:'siOtherType',otherRent:'siOtherRent',rentalSales:'siRentalSales',
+     commencement:'siCommencement',expiry:'siExpiry',year1:'siYear1',year2:'siYear2',year3:'siYear3'
+   };
+   Object.entries(map).forEach(([k,id])=>s[k]=$(id)?.value??'');
+   calcStoreRental(true);saveStoreContactDrafts();saveStorePaymentDrafts();
+
+   for(const dt of storeDocTypes){
+     saveDocDraft(dt.key);
+     const files=collectStoreDocFiles(dt.key);
+     if(files.length){
+       const uploaded=await wbUploadStoreFiles(pid,`docs/${dt.key}`,files);
+       uploadedNow.push(...uploaded);
+       s.docs[dt.key].attachments=(s.docs[dt.key].attachments||[]).concat(uploaded);
+     }
+   }
+
+   const deletedPayments=(s.payments||[]).filter(p=>p._deleteOnSave);
+   for(const p of (s.payments||[]).filter(p=>!p._deleteOnSave)){
+     const i=s.payments.indexOf(p);
+     const input=$('paymentFile_'+i);
+     if(input?.files?.length){
+       const uploaded=await wbUploadStoreFiles(pid,`payments/${p.id||'new'}`,[...input.files]);
+       uploadedNow.push(...uploaded);p.attachments=(p.attachments||[]).concat(uploaded);
+     }
+     await wbSavePayment(pid,p);
+   }
+   for(const p of deletedPayments){
+     if(p.id)await wbDeletePayment(p.id);
+     await wbRemoveStoreFiles((p.attachments||[]).map(a=>a.path).filter(Boolean));
+   }
+   s.payments=(s.payments||[]).filter(p=>!p._deleteOnSave);
+   await wbSaveStore({...s,id:pid});
+
+   const ms=manualStores.find(x=>Number(x.id)===pid);
+   if(ms){ms.name=s.name;ms.city=s.city;ms.openingDate=s.openingDate;ms.storeStatus=s.storeStatus||'Active';}
+   storeEditSnapshot=deepClone(s);setStoreFormEditable(false);
+   renderStoreContacts();renderStorePayments();renderStoreDocs();
+   if($('page-payments')&&!$('page-payments').classList.contains('hidden'))renderCentralPayments();
+   wbShowSyncNotice('Store Information saved online.','success',1800);
+ }catch(e){
+   storeInfoData[pid]=before;
+   await wbRemoveStoreFiles(uploadedNow.map(x=>x.path));
+   loadStoreForm();wbSyncError('Store Information sync failed',e);
  }
- storeEditSnapshot=deepClone(s);
- renderStoreMasterList();
- setStoreFormEditable(false);
- renderStoreContacts();
- renderStorePayments();
- renderStoreDocs();
- if($('page-payments') && !$('page-payments').classList.contains('hidden'))renderCentralPayments();
- alert('Store Information saved for '+s.name+'.');
 }
 
 
@@ -3062,6 +3204,7 @@ async function saveProject(){
      protoSeedProject(obj.id);
      try{
        for(const t of protoAllTasks(obj.id))await wbSaveTask(t);
+       syncStoreInfoFromProjects();if(storeInfoData[obj.id])await wbSaveStore({...storeInfoData[obj.id],id:obj.id});
      }catch(taskErr){
        // Avoid a half-created project when default task creation fails.
        await wbDeleteProject(obj.id).catch(()=>{});
