@@ -126,7 +126,7 @@ table{width:100%;border-collapse:collapse}th,td{padding:10px 8px;border-top:1px 
 @media(max-width:800px){.store-access-grid{grid-template-columns:1fr}}
 
 
-.central-payment-head,.central-payment-row{display:grid;grid-template-columns:1.05fr 1.3fr .9fr .95fr .95fr 1.5fr 1.3fr 90px;gap:10px;align-items:start}
+.central-payment-head,.central-payment-row{display:grid;grid-template-columns:1.05fr 1.25fr .85fr .95fr .95fr .9fr 1.35fr 1.2fr 90px;gap:10px;align-items:start}
 .central-payment-head{padding:10px 8px;border-bottom:1px solid var(--line);font-size:12px;font-weight:800;color:var(--muted);text-transform:uppercase}
 .central-payment-row{padding:10px 8px;border-bottom:1px solid var(--line)}
 .central-payment-row textarea{min-height:58px}
@@ -564,7 +564,7 @@ button.confirm-delete{background:#b42318!important;color:#fff!important;border-c
 .portal-return-btn{position:fixed;right:18px;top:14px;z-index:9998;background:#fff;border:1px solid #e7d5dc;color:#b64063;border-radius:999px;padding:8px 13px;font-size:12px;font-weight:700;text-decoration:none;box-shadow:0 6px 18px rgba(24,36,58,.10)}
 .portal-return-btn:hover{background:#fff7fa}
 </style>
-<!-- WOW_BEAUTY_STORE_OPENING_SYNC_FIX_ON_USER_LATEST: integrated production modules + new Dashboard/My Task/Workflow -->
+<!-- WOW_BEAUTY_STORE_OPENING_PAYMENT_V2_FILTER_IMPORT: integrated production modules + new Dashboard/My Task/Workflow -->
 </head>
 <body><a class="portal-return-btn" href="../">← Management Portal</a>
 <section id="loginScreen" class="login-screen">
@@ -795,6 +795,8 @@ button.confirm-delete{background:#b42318!important;color:#fff!important;border-c
       <select id="paymentStoreFilter" onchange="renderCentralPayments()"></select>
       <button class="secondary" onclick="wbExportPaymentsCsv()">Export CSV</button>
       <button class="secondary" onclick="wbExportPaymentsXlsx()">Export XLSX</button>
+      <input id="paymentImportExcel" type="file" accept=".xlsx,.xls" class="hidden" onchange="wbImportPaymentExcel(this)">
+      <button class="secondary" onclick="wbChoosePaymentExcel()">Import Excel</button>
       <button class="primary" onclick="addCentralPayment()">+ Add Payment</button>
     </div>
   </div>
@@ -803,8 +805,21 @@ button.confirm-delete{background:#b42318!important;color:#fff!important;border-c
     <div class="section-title-row">
       <div><h2>Store Payments</h2><div class="small">Deposits, rent, licence, fit-out, utilities and other store-related payments. Click Edit to modify a saved record.</div></div>
     </div>
+
+    <div class="card" style="padding:12px;margin:10px 0 14px;background:#fafcff">
+      <div class="small" style="font-weight:800;margin-bottom:8px">FILTER</div>
+      <div style="display:grid;grid-template-columns:1.2fr .9fr 1fr 1fr auto;gap:8px;align-items:end">
+        <div><label style="margin:0 0 5px">Item / Comment</label><input id="paymentTextFilter" placeholder="Search item or comment" oninput="renderCentralPayments()"></div>
+        <div><label style="margin:0 0 5px">Status</label><select id="paymentStatusFilter" onchange="renderCentralPayments()"><option value="ALL">All Status</option><option>Pending</option><option>Paid</option><option>Overdue</option><option>Waived</option></select></div>
+        <div><label style="margin:0 0 5px">Account Date</label><input id="paymentAccountDateFilter" type="date" onchange="renderCentralPayments()"></div>
+        <div><label style="margin:0 0 5px">Payment Date</label><input id="paymentPaymentDateFilter" type="date" onchange="renderCentralPayments()"></div>
+        <div><button class="secondary" onclick="wbClearPaymentFilters()">Clear Filter</button></div>
+      </div>
+      <div class="small" style="margin-top:8px">Excel Import uses the currently selected Store. Select a specific store before importing.</div>
+    </div>
+
     <div class="central-payment-head">
-      <div>Store</div><div>Item</div><div>Amount</div><div>Date</div><div>Status</div><div>Comment</div><div>Attachments</div><div>Action</div>
+      <div>Store</div><div>Item</div><div>Amount</div><div>Account Date</div><div>Payment Date</div><div>Status</div><div>Comment</div><div>Attachments</div><div>Action</div>
     </div>
     <div id="centralPaymentRows"></div>
   </div>
@@ -1353,7 +1368,10 @@ function wbStoreFromRow(r){
 function wbPaymentFromRow(r){
  return {
    id:Number(r.id),item:r.item||'',amount:r.amount==null?'':Number(r.amount),
-   date:r.payment_date||'',status:r.status||'Pending',comment:r.comment||'',
+   accountDate:r.account_date||r.payment_date||'',
+   paymentDate:r.payment_date||'',
+   date:r.payment_date||'', // compatibility with Store Information payment editor
+   status:r.status||'Pending',comment:r.comment||'',
    attachments:Array.isArray(r.attachments)?r.attachments:[]
  };
 }
@@ -1368,10 +1386,24 @@ async function wbDeleteStore(id){
 }
 async function wbSavePayment(storeId,p){
  if(!p.id)p.id=wbNewId();
- const row={id:Number(p.id),store_id:Number(storeId),item:p.item||'',amount:Number(p.amount||0),
-   payment_date:p.date||null,status:p.status||'Pending',comment:p.comment||'',attachments:p.attachments||[]};
+ const paymentDate=p.paymentDate||p.date||null;
+ const accountDate=p.accountDate||paymentDate||null;
+ const row={
+   id:Number(p.id),
+   store_id:Number(storeId),
+   item:p.item||'',
+   amount:Number(p.amount||0),
+   account_date:accountDate,
+   payment_date:paymentDate,
+   status:p.status||'Pending',
+   comment:p.comment||'',
+   attachments:p.attachments||[]
+ };
  const {error}=await supabaseClient.from('wb_payments').upsert(row,{onConflict:'id'});
  if(error)throw error;
+ p.accountDate=accountDate||'';
+ p.paymentDate=paymentDate||'';
+ p.date=p.paymentDate; // keep Store Information page compatible
 }
 async function wbDeletePayment(id){
  const {error}=await supabaseClient.from('wb_payments').delete().eq('id',Number(id));
@@ -2030,51 +2062,231 @@ function deleteStoreContact(i){
 }
 
 
+
+function wbClearPaymentFilters(){
+ if($('paymentTextFilter'))$('paymentTextFilter').value='';
+ if($('paymentStatusFilter'))$('paymentStatusFilter').value='ALL';
+ if($('paymentAccountDateFilter'))$('paymentAccountDateFilter').value='';
+ if($('paymentPaymentDateFilter'))$('paymentPaymentDateFilter').value='';
+ renderCentralPayments();
+}
+
+function wbChoosePaymentExcel(){
+ const storeId=$('paymentStoreFilter')?.value||'ALL';
+ if(storeId==='ALL'){
+   alert('Please select a specific Store first. Imported rows will use the selected Store.');
+   return;
+ }
+ if(!window.XLSX){
+   alert('Excel library is still loading. Please try again in a moment.');
+   return;
+ }
+ const input=$('paymentImportExcel');
+ if(input){input.value='';input.click();}
+}
+
+function wbExcelDateToIso(value){
+ if(value==null || value==='')return '';
+
+ // Excel serial number
+ if(typeof value==='number' && window.XLSX?.SSF){
+   const parsed=XLSX.SSF.parse_date_code(value);
+   if(parsed){
+     const p=n=>String(n).padStart(2,'0');
+     return `${parsed.y}-${p(parsed.m)}-${p(parsed.d)}`;
+   }
+ }
+
+ if(value instanceof Date && !isNaN(value)){
+   const p=n=>String(n).padStart(2,'0');
+   return `${value.getFullYear()}-${p(value.getMonth()+1)}-${p(value.getDate())}`;
+ }
+
+ const s=String(value).trim();
+ if(!s)return '';
+
+ // yyyy-mm-dd / yyyy/mm/dd
+ let m=s.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/);
+ if(m)return `${m[1]}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`;
+
+ // dd/mm/yyyy or dd-mm-yyyy
+ m=s.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})/);
+ if(m)return `${m[3]}-${String(m[2]).padStart(2,'0')}-${String(m[1]).padStart(2,'0')}`;
+
+ return '';
+}
+
+function wbExcelNumber(value){
+ if(value==null || value==='')return 0;
+ if(typeof value==='number')return Number.isFinite(value)?value:0;
+ const cleaned=String(value).replace(/[,RM$\s]/gi,'').trim();
+ const n=Number(cleaned);
+ return Number.isFinite(n)?n:0;
+}
+
+async function wbImportPaymentExcel(input){
+ const file=input?.files?.[0];
+ if(!file)return;
+
+ const storeId=Number($('paymentStoreFilter')?.value||0);
+ if(!storeId){
+   input.value='';
+   return alert('Please select a specific Store before importing.');
+ }
+ const store=storeInfoData[storeId];
+ if(!store){
+   input.value='';
+   return alert('Selected Store could not be found.');
+ }
+ if(!window.XLSX){
+   input.value='';
+   return alert('Excel library is still loading. Please try again.');
+ }
+
+ try{
+   const buffer=await file.arrayBuffer();
+   const workbook=XLSX.read(buffer,{type:'array',cellDates:true});
+   const sheet=workbook.Sheets[workbook.SheetNames[0]];
+   if(!sheet)throw new Error('No worksheet found in the Excel file.');
+
+   const rows=XLSX.utils.sheet_to_json(sheet,{header:1,defval:'',raw:true});
+   if(rows.length<2)throw new Error('No import rows found.');
+
+   const imported=[];
+   const skipped=[];
+
+   // Start from Excel row 2. Row 1 is treated as the header row.
+   for(let r=1;r<rows.length;r++){
+     const row=rows[r]||[];
+
+     // B = Account Date, C = Comment, G = Payment Date, H = Item, I:M = Amount total
+     const accountDateRaw=row[1];   // B
+     const comment=row[2];          // C
+     const paymentDateRaw=row[6];   // G
+     const itemRaw=row[7];          // H
+     const amount=[8,9,10,11,12].reduce((sum,c)=>sum+wbExcelNumber(row[c]),0); // I:M
+
+     const hasContent=String(accountDateRaw??'').trim() ||
+       String(comment??'').trim() ||
+       String(paymentDateRaw??'').trim() ||
+       String(itemRaw??'').trim() ||
+       [8,9,10,11,12].some(c=>String(row[c]??'').trim());
+     if(!hasContent)continue;
+
+     const accountDate=wbExcelDateToIso(accountDateRaw);
+     const paymentDate=wbExcelDateToIso(paymentDateRaw);
+
+     const payment={
+       id:wbNewId(),
+       item:String(itemRaw??'').trim(),
+       amount,
+       accountDate,
+       paymentDate,
+       date:paymentDate,
+       status:'Pending',
+       comment:String(comment??''),
+       attachments:[]
+     };
+
+     try{
+       await wbSavePayment(storeId,payment);
+       imported.push(payment);
+     }catch(e){
+       skipped.push({row:r+1,error:e?.message||String(e)});
+     }
+   }
+
+   store.payments=store.payments||[];
+   store.payments.push(...imported);
+
+   renderCentralPayments();
+   if(+$('storeSelect')?.value===storeId)renderStorePayments();
+
+   const message=`Imported ${imported.length} payment record(s) to ${store.name||'selected store'}`+
+     (skipped.length?`. ${skipped.length} row(s) failed.`:'.');
+   wbShowSyncNotice(message,skipped.length?'error':'success',3500);
+
+   if(skipped.length){
+     console.warn('Payment Excel import skipped rows:',skipped);
+     alert(message+' Check browser console for failed row details.');
+   }
+ }catch(e){
+   wbSyncError('Payment Excel import failed',e);
+ }finally{
+   input.value='';
+ }
+}
+
 function renderCentralPayments(){
  if(!paymentAccessAllowed())return;
  syncStoreInfoFromProjects();
+
  const filter=$('paymentStoreFilter');
  if(filter){
    const old=filter.value;
    filter.innerHTML='<option value="ALL">All Stores</option>'+allStoreRecords().map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
    if(old && [...filter.options].some(o=>o.value===old))filter.value=old;
  }
+
  const selected=filter?.value||'ALL';
+ const textFilter=($('paymentTextFilter')?.value||'').trim().toLowerCase();
+ const statusFilter=$('paymentStatusFilter')?.value||'ALL';
+ const accountDateFilter=$('paymentAccountDateFilter')?.value||'';
+ const paymentDateFilter=$('paymentPaymentDateFilter')?.value||'';
+
  const rows=[];
  allStoreRecords().forEach(p=>{
    const s=storeInfoData[p.id]; if(!s)return;
    s.payments=s.payments||[];
+
    s.payments.forEach((pay,i)=>{
+     if(pay._deleteOnSave)return;
      if(selected!=='ALL' && String(p.id)!==String(selected))return;
+
+     const accountDate=pay.accountDate||pay.paymentDate||pay.date||'';
+     const paymentDate=pay.paymentDate||pay.date||'';
+     const haystack=`${pay.item||''} ${pay.comment||''}`.toLowerCase();
+
+     if(textFilter && !haystack.includes(textFilter))return;
+     if(statusFilter!=='ALL' && (pay.status||'Pending')!==statusFilter)return;
+     if(accountDateFilter && accountDate!==accountDateFilter)return;
+     if(paymentDateFilter && paymentDate!==paymentDateFilter)return;
+
      rows.push({p,s,pay,i});
    });
  });
+
  $('centralPaymentRows').innerHTML=rows.map(({p,pay,i})=>{
    const key=`${p.id}_${i}`;
    const editing=!!centralPaymentEdit[key];
    const item=pay.item||'—';
    const amount=(pay.amount!=='' && pay.amount!=null)?`RM ${Number(pay.amount||0).toFixed(2)}`:'—';
-   const date=pay.date||'—';
+   const accountDate=pay.accountDate||pay.paymentDate||pay.date||'—';
+   const paymentDate=pay.paymentDate||pay.date||'—';
    const status=pay.status||'Pending';
    const comment=pay.comment||'—';
    const attachments=(pay.attachments||[]);
+
    if(!editing){
      return `<div class="central-payment-row">
        <div><b>${escapeHtml(p.name||'')}</b><div class="small">${escapeHtml(p.city||'')}</div></div>
        <div>${escapeHtml(item)}</div>
        <div>${amount}</div>
-       <div>${date}</div>
-       <div><span class="badge ${status==='Paid'?'ok':status==='Overdue'?'bad':'warn'}">${status}</span></div>
+       <div>${escapeHtml(accountDate)}</div>
+       <div>${escapeHtml(paymentDate)}</div>
+       <div><span class="badge ${status==='Paid'?'ok':status==='Overdue'?'bad':'warn'}">${escapeHtml(status)}</span></div>
        <div>${escapeHtml(comment)}</div>
        <div><div class="inline-attachment">${wbStoreAttachmentHtml(attachments)}</div></div>
        <div><button class="secondary" onclick="editCentralPayment(${p.id},${i})">Edit</button></div>
      </div>`;
    }
+
    return `<div class="central-payment-row">
      <div><b>${escapeHtml(p.name||'')}</b><div class="small">${escapeHtml(p.city||'')}</div></div>
      <div><input id="cpItem_${p.id}_${i}" value="${escapeHtml(pay.item||'')}" placeholder="e.g. Security Deposit / Rental / Licence"></div>
      <div><input id="cpAmount_${p.id}_${i}" type="number" step="0.01" value="${pay.amount??''}" placeholder="Enter RM amount"></div>
-     <div><input id="cpDate_${p.id}_${i}" type="date" value="${pay.date||''}" title="Select payment / due date"></div>
+     <div><input id="cpAccountDate_${p.id}_${i}" type="date" value="${escapeHtml(pay.accountDate||pay.paymentDate||pay.date||'')}" title="Account Date"></div>
+     <div><input id="cpPaymentDate_${p.id}_${i}" type="date" value="${escapeHtml(pay.paymentDate||pay.date||'')}" title="Payment Date"></div>
      <div><select id="cpStatus_${p.id}_${i}"><option ${status==='Pending'?'selected':''}>Pending</option><option ${status==='Paid'?'selected':''}>Paid</option><option ${status==='Overdue'?'selected':''}>Overdue</option><option ${status==='Waived'?'selected':''}>Waived</option></select></div>
      <div><textarea id="cpComment_${p.id}_${i}" placeholder="Enter payment note / reference / follow-up">${escapeHtml(pay.comment||'')}</textarea></div>
      <div><input id="cpFile_${p.id}_${i}" type="file" multiple><div class="inline-attachment">${attachments.length?wbStoreAttachmentHtml(attachments):'Upload invoice / receipt / supporting file'}</div></div>
@@ -2084,7 +2296,7 @@ function renderCentralPayments(){
        <button class="secondary" style="margin-top:5px" onclick="deleteCentralPayment(${p.id},${i})">Delete</button>
      </div>
    </div>`;
- }).join('') || '<div class="small" style="padding:12px">No payment records. Click + Add Payment to create one.</div>';
+ }).join('') || '<div class="small" style="padding:12px">No payment records match the current filter.</div>';
 }
 
 function editCentralPayment(pid,i){
@@ -2104,12 +2316,16 @@ function cancelCentralPayment(pid,i){
 async function saveCentralPayment(pid,i){
  const s=storeInfoData[pid];if(!s||!s.payments?.[i])return;
  const p=s.payments[i],before=deepClone(p),newUploads=[];
+
  p.item=$(`cpItem_${pid}_${i}`)?.value||'';
  p.amount=parseFloat($(`cpAmount_${pid}_${i}`)?.value)||0;
- p.date=$(`cpDate_${pid}_${i}`)?.value||'';
+ p.accountDate=$(`cpAccountDate_${pid}_${i}`)?.value||'';
+ p.paymentDate=$(`cpPaymentDate_${pid}_${i}`)?.value||'';
+ p.date=p.paymentDate; // Store Information compatibility
  p.status=$(`cpStatus_${pid}_${i}`)?.value||'Pending';
  p.comment=$(`cpComment_${pid}_${i}`)?.value||'';
  p.attachments=p.attachments||[];
+
  try{
    const inp=$(`cpFile_${pid}_${i}`);
    if(inp?.files?.length){
@@ -2118,10 +2334,12 @@ async function saveCentralPayment(pid,i){
    }
    await wbSavePayment(pid,p);
    delete centralPaymentEdit[`${pid}_${i}`];
-   renderCentralPayments();if(+$('storeSelect')?.value===+pid)renderStorePayments();
+   renderCentralPayments();
+   if(+$('storeSelect')?.value===+pid)renderStorePayments();
    wbShowSyncNotice('Payment saved online.','success',1500);
  }catch(e){
-   Object.assign(p,before);await wbRemoveStoreFiles(newUploads.map(x=>x.path));
+   Object.assign(p,before);
+   await wbRemoveStoreFiles(newUploads.map(x=>x.path));
    wbSyncError('Payment sync failed',e);
  }
 }
@@ -2141,10 +2359,17 @@ function addCentralPayment(){
  const filter=$('paymentStoreFilter');let pid=filter?.value;
  if(!pid||pid==='ALL')pid=allStoreRecords()[0]?.id;pid=+pid;
  const s=storeInfoData[pid];if(!s)return alert('No active store available.');
+
  s.payments=s.payments||[];
- s.payments.push({id:wbNewId(),item:'',amount:'',date:'',status:'Pending',comment:'',attachments:[]});
- const idx=s.payments.length-1;centralPaymentEdit[`${pid}_${idx}`]=deepClone(s.payments[idx]);
- renderCentralPayments();if(+$('storeSelect')?.value===pid)renderStorePayments();
+ s.payments.push({
+   id:wbNewId(),item:'',amount:'',
+   accountDate:'',paymentDate:'',date:'',
+   status:'Pending',comment:'',attachments:[]
+ });
+ const idx=s.payments.length-1;
+ centralPaymentEdit[`${pid}_${idx}`]=deepClone(s.payments[idx]);
+ renderCentralPayments();
+ if(+$('storeSelect')?.value===pid)renderStorePayments();
 }
 
 function renderStorePayments(){
@@ -2165,7 +2390,7 @@ function saveStorePaymentDrafts(){
  (s.payments||[]).forEach((p,i)=>{
    p.item=$('paymentItem_'+i)?.value||'';
    p.amount=parseFloat($('paymentAmount_'+i)?.value)||0;
-   p.date=$('paymentDate_'+i)?.value||'';
+   p.date=$('paymentDate_'+i)?.value||'';p.paymentDate=p.date;p.accountDate=p.accountDate||p.paymentDate;
    p.status=$('paymentStatus_'+i)?.value||'Pending';
    p.comment=$('paymentComment_'+i)?.value||'';
    p.attachments=p.attachments||[];
@@ -2176,7 +2401,7 @@ function addStorePayment(){
  const pid=+$('storeSelect')?.value,s=storeInfoData[pid]; if(!s)return;
  saveStorePaymentDrafts();
  s.payments=s.payments||[];
- s.payments.push({item:'',amount:'',date:'',status:'Pending',comment:'',attachments:[]});
+ s.payments.push({item:'',amount:'',accountDate:'',paymentDate:'',date:'',status:'Pending',comment:'',attachments:[]});
  renderStorePayments();
 }
 function deleteStorePayment(i){
@@ -3077,14 +3302,40 @@ function wbStoreExportRows(){
  });
 }
 function wbPaymentExportRows(){
- const selected=$('paymentStoreFilter')?.value||'ALL',rows=[];
+ const selected=$('paymentStoreFilter')?.value||'ALL';
+ const textFilter=($('paymentTextFilter')?.value||'').trim().toLowerCase();
+ const statusFilter=$('paymentStatusFilter')?.value||'ALL';
+ const accountDateFilter=$('paymentAccountDateFilter')?.value||'';
+ const paymentDateFilter=$('paymentPaymentDateFilter')?.value||'';
+ const rows=[];
+
  allStoreRecords().forEach(r=>{
    if(selected!=='ALL'&&String(r.id)!==String(selected))return;
-   const s=storeInfoData[r.id];(s?.payments||[]).filter(p=>!p._deleteOnSave).forEach(p=>rows.push({
-     'Payment ID':p.id||'','Store':s.name||r.name||'','City':s.city||'','Item':p.item||'',
-     'Amount (RM)':Number(p.amount||0),'Date':p.date||'','Status':p.status||'',
-     'Comment':p.comment||'','Attachment Count':(p.attachments||[]).length
-   }));
+   const s=storeInfoData[r.id];
+
+   (s?.payments||[]).filter(p=>!p._deleteOnSave).forEach(p=>{
+     const accountDate=p.accountDate||p.paymentDate||p.date||'';
+     const paymentDate=p.paymentDate||p.date||'';
+     const haystack=`${p.item||''} ${p.comment||''}`.toLowerCase();
+
+     if(textFilter && !haystack.includes(textFilter))return;
+     if(statusFilter!=='ALL' && (p.status||'Pending')!==statusFilter)return;
+     if(accountDateFilter && accountDate!==accountDateFilter)return;
+     if(paymentDateFilter && paymentDate!==paymentDateFilter)return;
+
+     rows.push({
+       'Payment ID':p.id||'',
+       'Store':s.name||r.name||'',
+       'City':s.city||'',
+       'Item':p.item||'',
+       'Amount (RM)':Number(p.amount||0),
+       'Account Date':accountDate,
+       'Payment Date':paymentDate,
+       'Status':p.status||'',
+       'Comment':p.comment||'',
+       'Attachment Count':(p.attachments||[]).length
+     });
+   });
  });
  return rows;
 }
