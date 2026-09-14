@@ -564,7 +564,7 @@ button.confirm-delete{background:#b42318!important;color:#fff!important;border-c
 .portal-return-btn{position:fixed;right:18px;top:14px;z-index:9998;background:#fff;border:1px solid #e7d5dc;color:#b64063;border-radius:999px;padding:8px 13px;font-size:12px;font-weight:700;text-decoration:none;box-shadow:0 6px 18px rgba(24,36,58,.10)}
 .portal-return-btn:hover{background:#fff7fa}
 </style>
-<!-- WOW_BEAUTY_GITHUB_RELEASE_V9_2_PAYMENT_ACCESS_DOC_UPLOAD_FIX: integrated production modules + new Dashboard/My Task/Workflow -->
+<!-- WOW_BEAUTY_STORE_OPENING_SYNC_FIX_ON_USER_LATEST: integrated production modules + new Dashboard/My Task/Workflow -->
 </head>
 <body><a class="portal-return-btn" href="../">← Management Portal</a>
 <section id="loginScreen" class="login-screen">
@@ -1256,7 +1256,8 @@ async function doLogin(){
        wbShowSyncNotice('Some workspace data could not be loaded.','error');
      }else{
        wbShowSyncNotice('Workspace synced.','success',1800);
-       wbRenderVisiblePage();
+       renderAll();
+       wbRefreshAccessState();
      }
    });
  }catch(e){
@@ -1418,24 +1419,94 @@ function wbStoreAttachmentHtml(list){
    return `<span class="proto-attachment-chip">${label} · Preview unavailable</span>`;
  }).join('<br>');
 }
+
+async function wbLoadAccessSettingsOnly(){
+ const {data,error}=await supabaseClient
+   .from('wb_app_settings')
+   .select('key,value')
+   .in('key',['store_access','payment_access']);
+
+ if(error)throw error;
+
+ (data||[]).forEach(r=>{
+   if(r.key==='payment_access' && Array.isArray(r.value?.departments)){
+     paymentAccessSettings={departments:[...r.value.departments]};
+   }
+   if(r.key==='store_access' && Array.isArray(r.value?.departments)){
+     storeAccessSettings={departments:[...r.value.departments]};
+   }
+ });
+
+ return data||[];
+}
+
+function wbRefreshAccessState(){
+ if($('paymentListNav')){
+   $('paymentListNav').classList.toggle('hidden',!paymentAccessAllowed());
+ }
+ if($('storeInfoNav')){
+   $('storeInfoNav').classList.toggle('hidden',!storeAccessAllowed());
+ }
+
+ if(dashboardIsSuperAdmin()){
+   try{renderPaymentAccessSettings()}catch(e){console.warn('Payment access render:',e)}
+   try{renderStoreAccessSettings()}catch(e){console.warn('Store access render:',e)}
+ }
+}
+
+async function wbAccessDiagnostics(){
+ const {data:settings,error}=await supabaseClient
+   .from('wb_app_settings')
+   .select('key,value,updated_at')
+   .in('key',['store_access','payment_access']);
+
+ const result={
+   currentUser:currentUser?{
+     name:currentUser.name,
+     email:currentUser.email,
+     department:currentUser.dept,
+     role:currentUser.role
+   }:null,
+   settings:settings||[],
+   settingsError:error?.message||null,
+   storeAllowed:storeAccessAllowed(),
+   paymentAllowed:paymentAccessAllowed()
+ };
+
+ console.table(result.settings||[]);
+ console.log('WOW Beauty access diagnostics',result);
+ return result;
+}
+
 async function loadStorePaymentDataFromSupabase(){
  const [{data:settings,error:se},{data:stores,error:ste},{data:pays,error:pe}]=await Promise.all([
-   supabaseClient.from('wb_app_settings').select('key,value'),
+   supabaseClient.from('wb_app_settings').select('key,value').in('key',['store_access','payment_access']),
    supabaseClient.from('wb_store_info').select('*').order('id'),
    supabaseClient.from('wb_payments').select('*').order('id')
  ]);
  if(se)throw se;if(ste)throw ste;if(pe)throw pe;
 
  (settings||[]).forEach(r=>{
-   if(r.key==='payment_access'&&Array.isArray(r.value?.departments))paymentAccessSettings={departments:r.value.departments};
-   if(r.key==='store_access'&&Array.isArray(r.value?.departments))storeAccessSettings={departments:r.value.departments};
+   if(r.key==='payment_access'&&Array.isArray(r.value?.departments)){
+     paymentAccessSettings={departments:[...r.value.departments]};
+   }
+   if(r.key==='store_access'&&Array.isArray(r.value?.departments)){
+     storeAccessSettings={departments:[...r.value.departments]};
+   }
  });
 
  storeInfoData={};manualStores=[];
  (stores||[]).forEach(r=>{
    const s=wbStoreFromRow(r);storeInfoData[s.id]=s;
-   if(s.source==='Manual')manualStores.push({id:s.id,name:s.name||'',city:s.city||'',openingDate:s.openingDate||'',storeStatus:s.storeStatus||'Active'});
+   if(s.source==='Manual')manualStores.push({
+     id:s.id,
+     name:s.name||'',
+     city:s.city||'',
+     openingDate:s.openingDate||'',
+     storeStatus:s.storeStatus||'Active'
+   });
  });
+
  (pays||[]).forEach(r=>{
    const sid=Number(r.store_id);
    if(storeInfoData[sid]){
@@ -1452,7 +1523,9 @@ async function loadStorePaymentDataFromSupabase(){
      if(s)await wbSaveStore({...s,id:p.id});
    }
  }
+
  wbStorePaymentLoaded=true;
+ wbRefreshAccessState();
 }
 
 let storeInfoData = {};
@@ -1494,22 +1567,28 @@ function renderPaymentAccessSettings(){
 
 async function savePaymentAccessSettings(){
  if(!dashboardIsSuperAdmin())return alert('Only Super Admin can change Payment List access.');
+
  const btn=$('savePaymentAccessBtn'),status=$('paymentAccessSaveStatus');
  const before=deepClone(paymentAccessSettings);
  const selected=departments
    .filter(d=>$('paymentDeptAccess_'+d.name.replace(/[^a-zA-Z0-9]/g,'_'))?.checked)
    .map(d=>d.name);
+
  if(btn){btn.disabled=true;btn.textContent='Saving...'}
  if(status)status.textContent='Saving to Supabase...';
+
  try{
-   const saved=await wbSaveSetting('payment_access',{departments:selected});
-   paymentAccessSettings={departments:Array.isArray(saved?.departments)?saved.departments:selected};
-   renderPaymentAccessSettings();
-   if($('paymentListNav'))$('paymentListNav').classList.toggle('hidden',!paymentAccessAllowed());
-   if(status)status.textContent=`Saved online · ${paymentAccessSettings.departments.length} department(s)`;
+   await wbSaveSetting('payment_access',{departments:selected});
+   await wbLoadAccessSettingsOnly();
+   wbRefreshAccessState();
+
+   if(status){
+     status.textContent=`Saved online · ${paymentAccessSettings.departments.length} department(s)`;
+   }
    wbShowSyncNotice('Payment List access saved online.','success',1800);
  }catch(e){
-   paymentAccessSettings=before;renderPaymentAccessSettings();
+   paymentAccessSettings=before;
+   renderPaymentAccessSettings();
    if(status)status.textContent='Save failed — please check the error notice.';
    wbSyncError('Payment access sync failed',e);
  }finally{
@@ -1534,22 +1613,28 @@ function renderStoreAccessSettings(){
 
 async function saveStoreAccessSettings(){
  if(!dashboardIsSuperAdmin())return alert('Only Super Admin can change Store Information access.');
+
  const btn=$('saveStoreAccessBtn'),status=$('storeAccessSaveStatus');
  const before=deepClone(storeAccessSettings);
  const selected=departments
    .filter(d=>$('storeDeptAccess_'+d.name.replace(/[^a-zA-Z0-9]/g,'_'))?.checked)
    .map(d=>d.name);
+
  if(btn){btn.disabled=true;btn.textContent='Saving...'}
  if(status)status.textContent='Saving to Supabase...';
+
  try{
-   const saved=await wbSaveSetting('store_access',{departments:selected});
-   storeAccessSettings={departments:Array.isArray(saved?.departments)?saved.departments:selected};
-   renderStoreAccessSettings();
-   if($('storeInfoNav'))$('storeInfoNav').classList.toggle('hidden',!storeAccessAllowed());
-   if(status)status.textContent=`Saved online · ${storeAccessSettings.departments.length} department(s)`;
+   await wbSaveSetting('store_access',{departments:selected});
+   await wbLoadAccessSettingsOnly();
+   wbRefreshAccessState();
+
+   if(status){
+     status.textContent=`Saved online · ${storeAccessSettings.departments.length} department(s)`;
+   }
    wbShowSyncNotice('Store Information access saved online.','success',1800);
  }catch(e){
-   storeAccessSettings=before;renderStoreAccessSettings();
+   storeAccessSettings=before;
+   renderStoreAccessSettings();
    if(status)status.textContent='Save failed — please check the error notice.';
    wbSyncError('Store access sync failed',e);
  }finally{
@@ -2298,8 +2383,19 @@ async function wbSaveProject(p){
  if(error)throw error;
 }
 async function wbDeleteProject(id){
- const {error}=await supabaseClient.from('wb_projects').delete().eq('id',Number(id));
+ const pid=Number(id);
+ const {data,error}=await supabaseClient.rpc('wb_delete_project_full',{p_project_id:pid});
  if(error)throw error;
+ if(data!==true)throw new Error('Project was not found or was not deleted.');
+
+ const {data:verify,error:verifyError}=await supabaseClient
+   .from('wb_projects')
+   .select('id')
+   .eq('id',pid)
+   .maybeSingle();
+
+ if(verifyError)throw verifyError;
+ if(verify)throw new Error('Project still exists online after delete request.');
 }
 async function wbSaveTask(t){
  const {error}=await supabaseClient.from('wb_project_tasks').upsert(wbTaskRow(t),{onConflict:'id'});
@@ -4613,7 +4709,8 @@ async function wbPortalSessionBootstrap(){
        wbShowSyncNotice('Some workspace data could not be loaded.','error');
      }else{
        wbShowSyncNotice('Workspace synced.','success',1400);
-       wbRenderVisiblePage();
+       renderAll();
+       wbRefreshAccessState();
      }
    });
  }catch(e){console.warn('Portal session bootstrap skipped:',e)}
