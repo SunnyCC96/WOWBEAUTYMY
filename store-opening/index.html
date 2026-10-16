@@ -563,9 +563,21 @@ button.confirm-delete{background:#b42318!important;color:#fff!important;border-c
 
 .portal-return-btn{position:fixed;right:18px;top:14px;z-index:9998;background:#fff;border:1px solid #e7d5dc;color:#b64063;border-radius:999px;padding:8px 13px;font-size:12px;font-weight:700;text-decoration:none;box-shadow:0 6px 18px rgba(24,36,58,.10)}
 .portal-return-btn:hover{background:#fff7fa}
+
+/* ===== Payment & Invoice Control V3 ===== */
+.invoice-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:14px 0}
+.invoice-kpi{padding:14px;border:1px solid var(--line);border-radius:12px;background:#fff}.invoice-kpi b{display:block;font-size:22px;margin-top:5px}
+.invoice-head,.invoice-row{display:grid;grid-template-columns:1.1fr 1.2fr .9fr .9fr .9fr .9fr .8fr .85fr .9fr 90px;gap:9px;align-items:start}
+.invoice-head{padding:10px 8px;border-bottom:1px solid var(--line);font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase}
+.invoice-row{padding:10px 8px;border-bottom:1px solid var(--line)}
+.invoice-alert{padding:10px 12px;border-radius:10px;margin-top:8px;border:1px solid var(--line);background:#fff}
+.invoice-alert.overdue{background:#fff5f5;border-color:#efc5c5}.invoice-alert.due-soon{background:#fffaf0;border-color:#efd7a8}
+@media(max-width:1250px){.invoice-head{display:none}.invoice-row{grid-template-columns:1fr 1fr}.invoice-row>div:last-child{grid-column:1/-1}}
+@media(max-width:760px){.invoice-summary,.invoice-row{grid-template-columns:1fr}}
 </style>
 <!-- WOW_BEAUTY_STORE_OPENING_PAYMENT_V2_FILTER_IMPORT: integrated production modules + new Dashboard/My Task/Workflow -->
 <!-- WOW_BEAUTY_PASSWORD_RECOVERY_V1: recovery email -> set new password -> sign out -> login -->
+<!-- WOW_BEAUTY_PAYMENT_INVOICE_CONTROL_V3 -->
 </head>
 <body><a class="portal-return-btn" href="../">← Management Portal</a>
 <section id="loginScreen" class="login-screen">
@@ -678,6 +690,7 @@ button.confirm-delete{background:#b42318!important;color:#fff!important;border-c
     <a class="active" onclick="page('dashboard',this)">⌂ Dashboard</a>
     <a id="storeInfoNav" class="hidden" onclick="page('stores',this)">▣ Store Information</a>
     <a id="paymentListNav" class="hidden" onclick="page('payments',this)">💳 Payment List</a>
+    <a id="invoiceTrackerNav" class="hidden" onclick="page('invoices',this)">🧾 Invoice Tracker</a>
     <a onclick="page('tasks',this)">☑ My Task</a>
     <a onclick="page('workflow',this)">⇄ Workflow</a>
       <a onclick="page('approvals',this)">☷ Pending Task</a>
@@ -813,7 +826,7 @@ button.confirm-delete{background:#b42318!important;color:#fff!important;border-c
       <div class="small">Central payment register synced with Store Information. Updates from either page use the same store payment data.</div>
     </div>
     <div class="store-top-actions">
-      <select id="paymentStoreFilter" onchange="renderCentralPayments()"></select>
+      <div><label style="margin:0 0 5px">Store</label><select id="paymentStoreFilter" onchange="renderCentralPayments()"></select></div>
       <button class="secondary" onclick="wbExportPaymentsCsv()">Export CSV</button>
       <button class="secondary" onclick="wbExportPaymentsXlsx()">Export XLSX</button>
       <input id="paymentImportExcel" type="file" accept=".xlsx,.xls" class="hidden" onchange="wbImportPaymentExcel(this)">
@@ -832,8 +845,8 @@ button.confirm-delete{background:#b42318!important;color:#fff!important;border-c
       <div style="display:grid;grid-template-columns:1.2fr .9fr 1fr 1fr auto;gap:8px;align-items:end">
         <div><label style="margin:0 0 5px">Item / Comment</label><input id="paymentTextFilter" placeholder="Search item or comment" oninput="renderCentralPayments()"></div>
         <div><label style="margin:0 0 5px">Status</label><select id="paymentStatusFilter" onchange="renderCentralPayments()"><option value="ALL">All Status</option><option>Pending</option><option>Paid</option><option>Overdue</option><option>Waived</option></select></div>
-        <div><label style="margin:0 0 5px">Account Date</label><input id="paymentAccountDateFilter" type="date" onchange="renderCentralPayments()"></div>
-        <div><label style="margin:0 0 5px">Payment Date</label><input id="paymentPaymentDateFilter" type="date" onchange="renderCentralPayments()"></div>
+        <div><label style="margin:0 0 5px">Account Month</label><input id="paymentAccountDateFilter" type="month" onchange="renderCentralPayments()"></div>
+        <div><label style="margin:0 0 5px">Payment Month</label><input id="paymentPaymentDateFilter" type="month" onchange="renderCentralPayments()"></div>
         <div><button class="secondary" onclick="wbClearPaymentFilters()">Clear Filter</button></div>
       </div>
       <div class="small" style="margin-top:8px">Excel Import uses the currently selected Store. Select a specific store before importing.</div>
@@ -844,6 +857,15 @@ button.confirm-delete{background:#b42318!important;color:#fff!important;border-c
     </div>
     <div id="centralPaymentRows"></div>
   </div>
+</section>
+
+
+<section id="page-invoices" class="hidden">
+ <div class="toolbar"><div><h1>Invoice Tracker</h1><div class="small">Invoice due control synced with Payment List. No duplicate payment record is created.</div></div>
+ <div class="store-top-actions"><select id="invoiceStoreFilter" onchange="renderInvoiceTracker()"></select><select id="invoiceStatusFilter" onchange="renderInvoiceTracker()"><option value="ALL">All Status</option><option>Pending</option><option>Due Soon</option><option>Overdue</option><option>Paid</option><option>Waived</option></select><input id="invoiceMonthFilter" type="month" onchange="renderInvoiceTracker()"><button class="secondary" onclick="wbClearInvoiceFilters()">Clear Filter</button><button class="primary" onclick="addInvoiceRecord()">+ Add Invoice</button></div></div>
+ <div class="invoice-summary"><div class="invoice-kpi"><span class="small">Open Invoices</span><b id="invoiceOpenCount">0</b></div><div class="invoice-kpi"><span class="small">Due Within 7 Days</span><b id="invoiceDueSoonCount">0</b></div><div class="invoice-kpi"><span class="small">Overdue</span><b id="invoiceOverdueCount">0</b></div><div class="invoice-kpi"><span class="small">Outstanding Amount</span><b id="invoiceOutstandingAmount">RM 0.00</b></div></div>
+ <div class="card panel"><div class="section-title-row"><div><h2>Invoice & Due Control</h2><div class="small">Due Soon is calculated within 7 days. Unpaid records past Due Date become Overdue automatically.</div></div></div><div id="invoiceAlerts"></div>
+ <div class="invoice-head"><div>Store</div><div>Invoice / Item</div><div>Invoice No.</div><div>Invoice Date</div><div>Received Date</div><div>Due Date</div><div>Amount</div><div>Status</div><div>Payment Date</div><div>Action</div></div><div id="invoiceRows"></div></div>
 </section>
 
 <section id="page-admin" class="hidden">
@@ -1379,6 +1401,7 @@ async function logout(){
 function page(id,el){
  if(id==='stores' && !storeAccessAllowed())return alert('You do not have access to Store Information.');
  if(id==='payments' && !paymentAccessAllowed())return alert('You do not have access to Payment List.');
+ if(id==='invoices' && !paymentAccessAllowed())return alert('You do not have access to Invoice Tracker.');
  document.querySelectorAll('[id^="page-"]').forEach(x=>x.classList.add('hidden'));
  const target=$('page-'+id); if(!target)return;
  target.classList.remove('hidden');
@@ -1389,6 +1412,7 @@ function page(id,el){
  if(id==='dashboard')renderDashboard();
  else if(id==='stores')renderStores();
  else if(id==='payments')renderCentralPayments();
+ else if(id==='invoices')renderInvoiceTracker();
  else if(id==='tasks')renderProtoTasks();
  else if(id==='workflow')renderProtoWorkflow();
  else if(id==='approvals')renderPendingTasks();
@@ -1457,6 +1481,7 @@ function wbPaymentFromRow(r){
    paymentDate:r.payment_date||'',
    date:r.payment_date||'', // compatibility with Store Information payment editor
    status:r.status||'Pending',comment:r.comment||'',
+   invoiceNo:r.invoice_no||'',invoiceDate:r.invoice_date||'',receivedDate:r.received_date||'',dueDate:r.due_date||'',
    attachments:Array.isArray(r.attachments)?r.attachments:[]
  };
 }
@@ -1482,6 +1507,7 @@ async function wbSavePayment(storeId,p){
    payment_date:paymentDate,
    status:p.status||'Pending',
    comment:p.comment||'',
+   invoice_no:p.invoiceNo||null,invoice_date:p.invoiceDate||null,received_date:p.receivedDate||null,due_date:p.dueDate||null,
    attachments:p.attachments||[]
  };
  const {error}=await supabaseClient.from('wb_payments').upsert(row,{onConflict:'id'});
@@ -1560,6 +1586,9 @@ async function wbLoadAccessSettingsOnly(){
 function wbRefreshAccessState(){
  if($('paymentListNav')){
    $('paymentListNav').classList.toggle('hidden',!paymentAccessAllowed());
+ }
+ if($('invoiceTrackerNav')){
+   $('invoiceTrackerNav').classList.toggle('hidden',!paymentAccessAllowed());
  }
  if($('storeInfoNav')){
    $('storeInfoNav').classList.toggle('hidden',!storeAccessAllowed());
@@ -2334,8 +2363,8 @@ function renderCentralPayments(){
 
      if(textFilter && !haystack.includes(textFilter))return;
      if(statusFilter!=='ALL' && (pay.status||'Pending')!==statusFilter)return;
-     if(accountDateFilter && accountDate!==accountDateFilter)return;
-     if(paymentDateFilter && paymentDate!==paymentDateFilter)return;
+     if(accountDateFilter && !String(accountDate).startsWith(accountDateFilter))return;
+     if(paymentDateFilter && !String(paymentDate).startsWith(paymentDateFilter))return;
 
      rows.push({p,s,pay,i});
    });
@@ -2440,6 +2469,105 @@ async function deleteCentralPayment(pid,i){
    renderCentralPayments();if(+$('storeSelect')?.value===+pid)renderStorePayments();
  }catch(e){wbSyncError('Delete payment failed',e)}
 }
+
+const invoiceEdit={};
+function wbInvoiceDerivedStatus(p){
+ const stored=p.status||'Pending';
+ if(stored==='Paid'||stored==='Waived')return stored;
+ if(!p.dueDate)return 'Pending';
+ const today=new Date(); today.setHours(0,0,0,0);
+ const due=new Date(p.dueDate+'T00:00:00');
+ if(isNaN(due))return 'Pending';
+ const days=Math.ceil((due-today)/86400000);
+ if(days<0)return 'Overdue';
+ if(days<=7)return 'Due Soon';
+ return 'Pending';
+}
+function wbClearInvoiceFilters(){
+ if($('invoiceStoreFilter'))$('invoiceStoreFilter').value='ALL';
+ if($('invoiceStatusFilter'))$('invoiceStatusFilter').value='ALL';
+ if($('invoiceMonthFilter'))$('invoiceMonthFilter').value='';
+ renderInvoiceTracker();
+}
+function renderInvoiceTracker(){
+ if(!paymentAccessAllowed()||!$('invoiceRows'))return;
+ syncStoreInfoFromProjects();
+ const sf=$('invoiceStoreFilter');
+ if(sf){
+   const old=sf.value;
+   sf.innerHTML='<option value="ALL">All Stores</option>'+allStoreRecords().map(p=>`<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('');
+   if(old && [...sf.options].some(o=>o.value===old))sf.value=old;
+ }
+ const storeFilter=sf?.value||'ALL', statusFilter=$('invoiceStatusFilter')?.value||'ALL', month=$('invoiceMonthFilter')?.value||'';
+ const all=[], visible=[];
+ allStoreRecords().forEach(store=>{
+   const s=storeInfoData[store.id]; if(!s)return;
+   (s.payments||[]).forEach((pay,i)=>{
+     if(pay._deleteOnSave)return;
+     const derived=wbInvoiceDerivedStatus(pay);
+     const row={store,s,pay,i,derived}; all.push(row);
+     if(storeFilter!=='ALL'&&String(store.id)!==String(storeFilter))return;
+     if(statusFilter!=='ALL'&&derived!==statusFilter)return;
+     if(month && !String(pay.invoiceDate||pay.receivedDate||pay.accountDate||'').startsWith(month))return;
+     visible.push(row);
+   });
+ });
+ const open=all.filter(x=>!['Paid','Waived'].includes(x.derived));
+ const dueSoon=all.filter(x=>x.derived==='Due Soon'), overdue=all.filter(x=>x.derived==='Overdue');
+ $('invoiceOpenCount').textContent=open.length;
+ $('invoiceDueSoonCount').textContent=dueSoon.length;
+ $('invoiceOverdueCount').textContent=overdue.length;
+ $('invoiceOutstandingAmount').textContent='RM '+open.reduce((a,x)=>a+Number(x.pay.amount||0),0).toFixed(2);
+ const alerts=[...overdue,...dueSoon].sort((a,b)=>String(a.pay.dueDate||'').localeCompare(String(b.pay.dueDate||'')));
+ $('invoiceAlerts').innerHTML=alerts.slice(0,8).map(x=>`<div class="invoice-alert ${x.derived==='Overdue'?'overdue':'due-soon'}"><b>${escapeHtml(x.store.name)} — ${escapeHtml(x.pay.item||'Invoice')}</b><div class="small">${x.derived} · Due ${escapeHtml(x.pay.dueDate||'—')} · RM ${Number(x.pay.amount||0).toFixed(2)}</div></div>`).join('')+(alerts.length?'<div style="height:12px"></div>':'');
+ $('invoiceRows').innerHTML=visible.map(({store,pay,i,derived})=>{
+   const key=`${store.id}_${i}`, editing=!!invoiceEdit[key];
+   if(!editing)return `<div class="invoice-row"><div><b>${escapeHtml(store.name)}</b></div><div>${escapeHtml(pay.item||'—')}</div><div>${escapeHtml(pay.invoiceNo||'—')}</div><div>${escapeHtml(pay.invoiceDate||'—')}</div><div>${escapeHtml(pay.receivedDate||'—')}</div><div>${escapeHtml(pay.dueDate||'—')}</div><div>RM ${Number(pay.amount||0).toFixed(2)}</div><div><span class="badge ${derived==='Paid'?'ok':derived==='Overdue'?'bad':'warn'}">${escapeHtml(derived)}</span></div><div>${escapeHtml(pay.paymentDate||'—')}</div><div><button class="secondary" onclick="editInvoiceRecord(${store.id},${i})">Edit</button></div></div>`;
+   return `<div class="invoice-row"><div><b>${escapeHtml(store.name)}</b></div><div><input id="invItem_${store.id}_${i}" value="${escapeHtml(pay.item||'')}"></div><div><input id="invNo_${store.id}_${i}" value="${escapeHtml(pay.invoiceNo||'')}"></div><div><input id="invDate_${store.id}_${i}" type="date" value="${escapeHtml(pay.invoiceDate||'')}"></div><div><input id="invReceived_${store.id}_${i}" type="date" value="${escapeHtml(pay.receivedDate||'')}"></div><div><input id="invDue_${store.id}_${i}" type="date" value="${escapeHtml(pay.dueDate||'')}"></div><div><input id="invAmount_${store.id}_${i}" type="number" step="0.01" value="${pay.amount??''}"></div><div><select id="invStatus_${store.id}_${i}"><option ${pay.status==='Pending'?'selected':''}>Pending</option><option ${pay.status==='Paid'?'selected':''}>Paid</option><option ${pay.status==='Waived'?'selected':''}>Waived</option></select></div><div><input id="invPayment_${store.id}_${i}" type="date" value="${escapeHtml(pay.paymentDate||'')}"></div><div><button class="primary" onclick="saveInvoiceRecord(${store.id},${i})">Save</button><button class="secondary" style="margin-top:5px" onclick="cancelInvoiceRecord(${store.id},${i})">Cancel</button></div></div>`;
+ }).join('')||'<div class="small" style="padding:12px">No invoice/payment records match the current filter.</div>';
+}
+function editInvoiceRecord(pid,i){
+ const p=storeInfoData[pid]?.payments?.[i];if(!p)return;
+ invoiceEdit[`${pid}_${i}`]=deepClone(p);renderInvoiceTracker();
+}
+function cancelInvoiceRecord(pid,i){
+ const key=`${pid}_${i}`,s=storeInfoData[pid];
+ if(s&&invoiceEdit[key])s.payments[i]=deepClone(invoiceEdit[key]);
+ delete invoiceEdit[key];renderInvoiceTracker();
+}
+async function saveInvoiceRecord(pid,i){
+ const s=storeInfoData[pid],p=s?.payments?.[i];if(!p)return;
+ const before=deepClone(p);
+ p.item=$(`invItem_${pid}_${i}`)?.value||'';
+ p.invoiceNo=$(`invNo_${pid}_${i}`)?.value||'';
+ p.invoiceDate=$(`invDate_${pid}_${i}`)?.value||'';
+ p.receivedDate=$(`invReceived_${pid}_${i}`)?.value||'';
+ p.dueDate=$(`invDue_${pid}_${i}`)?.value||'';
+ p.amount=parseFloat($(`invAmount_${pid}_${i}`)?.value)||0;
+ p.status=$(`invStatus_${pid}_${i}`)?.value||'Pending';
+ p.paymentDate=$(`invPayment_${pid}_${i}`)?.value||'';
+ p.date=p.paymentDate;p.accountDate=p.accountDate||p.invoiceDate||p.receivedDate||'';
+ if(p.paymentDate&&p.status==='Pending')p.status='Paid';
+ try{
+   await wbSavePayment(pid,p);delete invoiceEdit[`${pid}_${i}`];
+   renderInvoiceTracker();renderCentralPayments();
+   wbShowSyncNotice('Invoice / payment record saved online.','success',1500);
+ }catch(e){Object.assign(p,before);wbSyncError('Invoice sync failed',e)}
+}
+function addInvoiceRecord(){
+ let pid=$('invoiceStoreFilter')?.value;
+ if(!pid||pid==='ALL'){
+   const paymentStore=$('paymentStoreFilter')?.value;
+   if(paymentStore&&paymentStore!=='ALL')pid=paymentStore;
+ }
+ if(!pid||pid==='ALL')return alert('Please select a specific Store before adding an invoice.');
+ pid=+pid;const s=storeInfoData[pid];if(!s)return alert('Selected store could not be found.');
+ s.payments=s.payments||[];
+ s.payments.push({id:wbNewId(),item:'',amount:'',accountDate:'',paymentDate:'',date:'',status:'Pending',comment:'',invoiceNo:'',invoiceDate:'',receivedDate:'',dueDate:'',attachments:[]});
+ const i=s.payments.length-1;invoiceEdit[`${pid}_${i}`]=deepClone(s.payments[i]);renderInvoiceTracker();
+}
+
+
 function addCentralPayment(){
  const filter=$('paymentStoreFilter');let pid=filter?.value;
  if(!pid||pid==='ALL')pid=allStoreRecords()[0]?.id;pid=+pid;
