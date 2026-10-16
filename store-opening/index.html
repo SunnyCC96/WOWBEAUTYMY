@@ -577,7 +577,7 @@ button.confirm-delete{background:#b42318!important;color:#fff!important;border-c
 </style>
 <!-- WOW_BEAUTY_STORE_OPENING_PAYMENT_V2_FILTER_IMPORT: integrated production modules + new Dashboard/My Task/Workflow -->
 <!-- WOW_BEAUTY_PASSWORD_RECOVERY_V1: recovery email -> set new password -> sign out -> login -->
-<!-- WOW_BEAUTY_PAYMENT_INVOICE_CONTROL_V3_3_1_ACCOUNT_DATE_SORT -->
+<!-- WOW_BEAUTY_PAYMENT_INVOICE_CONTROL_V3_4_ACCOUNT_DATE_SYNC_SORT_ADD_TOP -->
 </head>
 <body><a class="portal-return-btn" href="../">← Management Portal</a>
 <section id="loginScreen" class="login-screen">
@@ -885,10 +885,9 @@ button.confirm-delete{background:#b42318!important;color:#fff!important;border-c
    <div><label>Invoice / Item *</label><input id="newInvItem" placeholder="e.g. October Rental / Electricity"></div>
    <div><label>Invoice No.</label><input id="newInvNo" placeholder="Invoice number"></div>
    <div><label>Amount (RM) *</label><input id="newInvAmount" type="number" step="0.01" min="0" placeholder="0.00"></div>
-   <div><label>Invoice Date</label><input id="newInvDate" type="date"></div>
+   <div><label>Account Date</label><input id="newInvDate" type="date"></div>
    <div><label>Received Date</label><input id="newInvReceived" type="date"></div>
    <div><label>Due Date *</label><input id="newInvDue" type="date"></div>
-   <div><label>Account Date</label><input id="newInvAccount" type="date"></div>
    <div class="full"><label>Comment</label><textarea id="newInvComment" placeholder="Optional note / reference"></textarea></div>
   </div>
   <div id="newInvMsg" class="small" style="margin-top:10px"></div>
@@ -901,7 +900,7 @@ button.confirm-delete{background:#b42318!important;color:#fff!important;border-c
  <div class="store-top-actions"><select id="invoiceStoreFilter" onchange="renderInvoiceTracker()"></select><select id="invoiceStatusFilter" onchange="renderInvoiceTracker()"><option value="ALL">All Status</option><option>Pending</option><option>Due Soon</option><option>Overdue</option><option>Paid</option><option>Waived</option></select><input id="invoiceMonthFilter" type="month" onchange="renderInvoiceTracker()"><button class="secondary" onclick="wbClearInvoiceFilters()">Clear Filter</button><button class="primary" onclick="addInvoiceRecord()">+ Add Invoice</button></div></div>
  <div class="invoice-summary"><div class="invoice-kpi"><span class="small">Open Invoices</span><b id="invoiceOpenCount">0</b></div><div class="invoice-kpi"><span class="small">Due Within 7 Days</span><b id="invoiceDueSoonCount">0</b></div><div class="invoice-kpi"><span class="small">Overdue</span><b id="invoiceOverdueCount">0</b></div><div class="invoice-kpi"><span class="small">Outstanding Amount</span><b id="invoiceOutstandingAmount">RM 0.00</b></div></div>
  <div class="card panel"><div class="section-title-row"><div><h2>Invoice & Due Control</h2><div class="small">Due Soon is calculated within 7 days. Unpaid records past Due Date become Overdue automatically.</div></div></div><div id="invoiceAlerts"></div>
- <div class="invoice-head"><div>Store</div><div>Invoice / Item</div><div>Invoice No.</div><div>Invoice Date</div><div>Received Date</div><div>Due Date</div><div>Amount</div><div>Status</div><div>Payment Date</div><div>Action</div></div><div id="invoiceRows"></div></div>
+ <div class="invoice-head"><div>Store</div><div>Invoice / Item</div><div>Invoice No.</div><div>Account Date</div><div>Received Date</div><div>Due Date</div><div>Amount</div><div>Status</div><div>Payment Date</div><div>Action</div></div><div id="invoiceRows"></div></div>
 </section>
 
 <section id="page-admin" class="hidden">
@@ -2432,7 +2431,11 @@ function renderCentralPayments(){
    });
  });
  rows.sort((a,b)=>{
-   // Payment List default order: newest Account Date first.
+   // Newly added / currently edited rows stay at the top.
+   const ae=!!centralPaymentEdit[`${a.p.id}_${a.i}`];
+   const be=!!centralPaymentEdit[`${b.p.id}_${b.i}`];
+   if(ae!==be)return be-ae;
+   // Saved Payment List order: newest Account Date first.
    const aa=String(a.pay.accountDate||'');
    const ba=String(b.pay.accountDate||'');
    if(aa!==ba)return ba.localeCompare(aa);
@@ -2577,9 +2580,15 @@ function renderInvoiceTracker(){
      const row={store,s,pay,i,derived}; all.push(row);
      if(storeFilter!=='ALL'&&String(store.id)!==String(storeFilter))return;
      if(statusFilter!=='ALL'&&derived!==statusFilter)return;
-     if(month && !String(pay.invoiceDate||pay.receivedDate||pay.accountDate||'').startsWith(month))return;
+     if(month && !String(pay.accountDate||'').startsWith(month))return;
      visible.push(row);
    });
+ });
+ visible.sort((a,b)=>{
+   const aa=String(a.pay.accountDate||'');
+   const ba=String(b.pay.accountDate||'');
+   if(aa!==ba)return ba.localeCompare(aa);
+   return Number(b.pay.id||0)-Number(a.pay.id||0);
  });
  const open=all.filter(x=>!['Paid','Waived'].includes(x.derived));
  const dueSoon=all.filter(x=>x.derived==='Due Soon'), overdue=all.filter(x=>x.derived==='Overdue');
@@ -2591,8 +2600,8 @@ function renderInvoiceTracker(){
  $('invoiceAlerts').innerHTML=alerts.slice(0,8).map(x=>`<div class="invoice-alert ${x.derived==='Overdue'?'overdue':'due-soon'}"><b>${escapeHtml(x.store.name)} — ${escapeHtml(x.pay.item||'Invoice')}</b><div class="small">${x.derived} · Due ${escapeHtml(x.pay.dueDate||'—')} · RM ${Number(x.pay.amount||0).toFixed(2)}</div></div>`).join('')+(alerts.length?'<div style="height:12px"></div>':'');
  $('invoiceRows').innerHTML=visible.map(({store,pay,i,derived})=>{
    const key=`${store.id}_${i}`, editing=!!invoiceEdit[key];
-   if(!editing)return `<div class="invoice-row"><div><b>${escapeHtml(store.name)}</b></div><div>${escapeHtml(pay.item||'—')}</div><div>${escapeHtml(pay.invoiceNo||'—')}</div><div>${escapeHtml(pay.invoiceDate||'—')}</div><div>${escapeHtml(pay.receivedDate||'—')}</div><div>${escapeHtml(pay.dueDate||'—')}</div><div>RM ${Number(pay.amount||0).toFixed(2)}</div><div><span class="badge ${derived==='Paid'?'ok':derived==='Overdue'?'bad':'warn'}">${escapeHtml(derived)}</span></div><div>${escapeHtml(pay.paymentDate||'—')}</div><div><button class="secondary" onclick="editInvoiceRecord(${store.id},${i})">Edit</button></div></div>`;
-   return `<div class="invoice-row"><div><b>${escapeHtml(store.name)}</b></div><div><input id="invItem_${store.id}_${i}" value="${escapeHtml(pay.item||'')}"></div><div><input id="invNo_${store.id}_${i}" value="${escapeHtml(pay.invoiceNo||'')}"></div><div><input id="invDate_${store.id}_${i}" type="date" value="${escapeHtml(pay.invoiceDate||'')}"></div><div><input id="invReceived_${store.id}_${i}" type="date" value="${escapeHtml(pay.receivedDate||'')}"></div><div><input id="invDue_${store.id}_${i}" type="date" value="${escapeHtml(pay.dueDate||'')}"></div><div><input id="invAmount_${store.id}_${i}" type="number" step="0.01" value="${pay.amount??''}"></div><div><select id="invStatus_${store.id}_${i}"><option ${pay.status==='Pending'?'selected':''}>Pending</option><option ${pay.status==='Paid'?'selected':''}>Paid</option><option ${pay.status==='Waived'?'selected':''}>Waived</option></select></div><div><input id="invPayment_${store.id}_${i}" type="date" value="${escapeHtml(pay.paymentDate||'')}"></div><div><button class="primary" onclick="saveInvoiceRecord(${store.id},${i})">Save</button><button class="secondary" style="margin-top:5px" onclick="cancelInvoiceRecord(${store.id},${i})">Cancel</button></div></div>`;
+   if(!editing)return `<div class="invoice-row"><div><b>${escapeHtml(store.name)}</b></div><div>${escapeHtml(pay.item||'—')}</div><div>${escapeHtml(pay.invoiceNo||'—')}</div><div>${escapeHtml(pay.accountDate||'—')}</div><div>${escapeHtml(pay.receivedDate||'—')}</div><div>${escapeHtml(pay.dueDate||'—')}</div><div>RM ${Number(pay.amount||0).toFixed(2)}</div><div><span class="badge ${derived==='Paid'?'ok':derived==='Overdue'?'bad':'warn'}">${escapeHtml(derived)}</span></div><div>${escapeHtml(pay.paymentDate||'—')}</div><div><button class="secondary" onclick="editInvoiceRecord(${store.id},${i})">Edit</button></div></div>`;
+   return `<div class="invoice-row"><div><b>${escapeHtml(store.name)}</b></div><div><input id="invItem_${store.id}_${i}" value="${escapeHtml(pay.item||'')}"></div><div><input id="invNo_${store.id}_${i}" value="${escapeHtml(pay.invoiceNo||'')}"></div><div><input id="invDate_${store.id}_${i}" type="date" value="${escapeHtml(pay.accountDate||'')}"></div><div><input id="invReceived_${store.id}_${i}" type="date" value="${escapeHtml(pay.receivedDate||'')}"></div><div><input id="invDue_${store.id}_${i}" type="date" value="${escapeHtml(pay.dueDate||'')}"></div><div><input id="invAmount_${store.id}_${i}" type="number" step="0.01" value="${pay.amount??''}"></div><div><select id="invStatus_${store.id}_${i}"><option ${pay.status==='Pending'?'selected':''}>Pending</option><option ${pay.status==='Paid'?'selected':''}>Paid</option><option ${pay.status==='Waived'?'selected':''}>Waived</option></select></div><div><input id="invPayment_${store.id}_${i}" type="date" value="${escapeHtml(pay.paymentDate||'')}"></div><div><button class="primary" onclick="saveInvoiceRecord(${store.id},${i})">Save</button><button class="secondary" style="margin-top:5px" onclick="cancelInvoiceRecord(${store.id},${i})">Cancel</button></div></div>`;
  }).join('')||'<div class="small" style="padding:12px">No invoice/payment records match the current filter.</div>';
 }
 function editInvoiceRecord(pid,i){
@@ -2609,13 +2618,13 @@ async function saveInvoiceRecord(pid,i){
  const before=deepClone(p);
  p.item=$(`invItem_${pid}_${i}`)?.value||'';
  p.invoiceNo=$(`invNo_${pid}_${i}`)?.value||'';
- p.invoiceDate=$(`invDate_${pid}_${i}`)?.value||'';
+ p.accountDate=$(`invDate_${pid}_${i}`)?.value||'';
  p.receivedDate=$(`invReceived_${pid}_${i}`)?.value||'';
  p.dueDate=$(`invDue_${pid}_${i}`)?.value||'';
  p.amount=parseFloat($(`invAmount_${pid}_${i}`)?.value)||0;
  p.status=$(`invStatus_${pid}_${i}`)?.value||'Pending';
  p.paymentDate=$(`invPayment_${pid}_${i}`)?.value||'';
- p.date=p.paymentDate;p.accountDate=p.accountDate||p.invoiceDate||p.receivedDate||'';
+ p.date=p.paymentDate;
  if(p.paymentDate&&p.status==='Pending')p.status='Paid';
  try{
    await wbSavePayment(pid,p);
@@ -2634,7 +2643,7 @@ function addInvoiceRecord(){
    sel.innerHTML='<option value="">Select Store</option>'+allStoreRecords().map(s=>`<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('');
    if(current!=='ALL'&&[...sel.options].some(o=>o.value===current))sel.value=current;
  }
- ['newInvItem','newInvNo','newInvAmount','newInvDate','newInvReceived','newInvDue','newInvAccount','newInvComment'].forEach(id=>{if($(id))$(id).value=''});
+ ['newInvItem','newInvNo','newInvAmount','newInvDate','newInvReceived','newInvDue','newInvComment'].forEach(id=>{if($(id))$(id).value=''});
  if($('newInvMsg'))$('newInvMsg').textContent='';
  $('addInvoiceModal')?.classList.remove('hidden');
  setTimeout(()=>$('newInvItem')?.focus(),50);
@@ -2652,11 +2661,11 @@ async function saveNewInvoice(){
  if(!dueDate)return msg&&(msg.textContent='Due Date is required.');
  const s=storeInfoData[pid];if(!s)return msg&&(msg.textContent='Selected store could not be found.');
  const p={id:wbNewId(),item,amount,
-   accountDate:$('newInvAccount')?.value||$('newInvDate')?.value||'',
+   accountDate:$('newInvDate')?.value||'',
    paymentDate:'',date:'',status:'Pending',
    comment:$('newInvComment')?.value||'',
    invoiceNo:$('newInvNo')?.value||'',
-   invoiceDate:$('newInvDate')?.value||'',
+   invoiceDate:'',
    receivedDate:$('newInvReceived')?.value||'',
    dueDate,attachments:[]};
  try{
