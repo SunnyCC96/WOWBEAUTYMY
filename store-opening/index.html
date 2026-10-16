@@ -565,6 +565,7 @@ button.confirm-delete{background:#b42318!important;color:#fff!important;border-c
 .portal-return-btn:hover{background:#fff7fa}
 </style>
 <!-- WOW_BEAUTY_STORE_OPENING_PAYMENT_V2_FILTER_IMPORT: integrated production modules + new Dashboard/My Task/Workflow -->
+<!-- WOW_BEAUTY_PASSWORD_RECOVERY_V1: recovery email -> set new password -> sign out -> login -->
 </head>
 <body><a class="portal-return-btn" href="../">← Management Portal</a>
 <section id="loginScreen" class="login-screen">
@@ -649,6 +650,26 @@ button.confirm-delete{background:#b42318!important;color:#fff!important;border-c
     <div class="wb-footer">Version 2.4</div>
   </section>
 </section>
+
+
+<div id="passwordRecoveryModal" class="modal hidden">
+  <div class="modal-card" style="width:min(520px,calc(100vw - 36px))">
+    <h2>Set New Password</h2>
+    <div class="small" style="margin:6px 0 18px">Enter a new password for your WOW BEAUTY account.</div>
+    <div class="wb-field">
+      <label for="recoveryPassword">New Password</label>
+      <input id="recoveryPassword" type="password" autocomplete="new-password" minlength="8" placeholder="Minimum 8 characters">
+    </div>
+    <div class="wb-field">
+      <label for="recoveryPasswordConfirm">Confirm New Password</label>
+      <input id="recoveryPasswordConfirm" type="password" autocomplete="new-password" minlength="8" placeholder="Re-enter new password">
+    </div>
+    <div id="recoveryPasswordMsg" class="small" style="margin-top:12px"></div>
+    <div class="modal-actions-row">
+      <button class="primary" id="recoveryPasswordBtn" type="button" onclick="wbUpdateRecoveredPassword()">Update Password</button>
+    </div>
+  </div>
+</div>
 
 <div id="app" class="shell hidden">
 <aside class="sidebar">
@@ -1184,7 +1205,10 @@ async function forgotPassword(e){
  const email=$('loginEmail')?.value.trim();
  if(!email)return alert('Please enter your email first.');
  try{
-   const {error}=await supabaseClient.auth.resetPasswordForEmail(email,{redirectTo:location.origin});
+   const recoveryUrl=new URL(location.href);
+   recoveryUrl.hash='';
+   recoveryUrl.search='';
+   const {error}=await supabaseClient.auth.resetPasswordForEmail(email,{redirectTo:recoveryUrl.toString()});
    if(error)throw error;
    alert('Password reset email sent. Please check your inbox.');
  }catch(err){
@@ -1192,7 +1216,68 @@ async function forgotPassword(e){
    alert('Unable to send reset email: '+(err?.message||'Unknown error'));
  }
 }
+
 initLoginCover();
+
+let wbPasswordRecoveryMode=false;
+
+function wbShowPasswordRecovery(){
+  wbPasswordRecoveryMode=true;
+  $('app')?.classList.add('hidden');
+  $('loginScreen')?.classList.add('hidden');
+  $('passwordRecoveryModal')?.classList.remove('hidden');
+  if($('recoveryPassword'))$('recoveryPassword').value='';
+  if($('recoveryPasswordConfirm'))$('recoveryPasswordConfirm').value='';
+  if($('recoveryPasswordMsg')){
+    $('recoveryPasswordMsg').textContent='Recovery link verified. Please set your new password.';
+    $('recoveryPasswordMsg').style.color='#6f7f92';
+  }
+  setTimeout(()=>$('recoveryPassword')?.focus(),50);
+}
+
+async function wbUpdateRecoveredPassword(){
+  const pw=$('recoveryPassword')?.value||'';
+  const confirm=$('recoveryPasswordConfirm')?.value||'';
+  const msg=$('recoveryPasswordMsg');
+  const btn=$('recoveryPasswordBtn');
+
+  if(pw.length<8){
+    if(msg){msg.textContent='Password must be at least 8 characters.';msg.style.color='#be3834'}
+    return;
+  }
+  if(pw!==confirm){
+    if(msg){msg.textContent='Passwords do not match.';msg.style.color='#be3834'}
+    return;
+  }
+
+  if(btn){btn.disabled=true;btn.textContent='Updating...'}
+  try{
+    const {error}=await supabaseClient.auth.updateUser({password:pw});
+    if(error)throw error;
+    if(msg){msg.textContent='Password updated successfully. Signing you out...';msg.style.color='#118456'}
+    await new Promise(r=>setTimeout(r,700));
+    await supabaseClient.auth.signOut();
+    wbPasswordRecoveryMode=false;
+    $('passwordRecoveryModal')?.classList.add('hidden');
+    $('app')?.classList.add('hidden');
+    $('loginScreen')?.classList.remove('hidden');
+    clearLoginPassword();
+    alert('Password updated successfully. Please log in with your new password.');
+  }catch(err){
+    console.error('Password update error:',err);
+    if(msg){msg.textContent='Unable to update password: '+(err?.message||'Unknown error');msg.style.color='#be3834'}
+  }finally{
+    if(btn){btn.disabled=false;btn.textContent='Update Password'}
+  }
+}
+
+// Supabase emits PASSWORD_RECOVERY after the email recovery link establishes a recovery session.
+supabaseClient.auth.onAuthStateChange((event)=>{
+  if(event==='PASSWORD_RECOVERY'){
+    setTimeout(wbShowPasswordRecovery,0);
+  }
+});
+
 
 
 function wbEnsureSyncNotice(){
@@ -4930,6 +5015,9 @@ setInterval(()=>{
 
 async function wbPortalSessionBootstrap(){
  try{
+   // Give Supabase a moment to emit PASSWORD_RECOVERY before normal session bootstrap.
+   await new Promise(r=>setTimeout(r,250));
+   if(wbPasswordRecoveryMode)return;
    const {data:{session}}=await supabaseClient.auth.getSession();
    if(!session?.user?.id)return;
    const {data:profile,error}=await supabaseClient
