@@ -577,7 +577,7 @@ button.confirm-delete{background:#b42318!important;color:#fff!important;border-c
 </style>
 <!-- WOW_BEAUTY_STORE_OPENING_PAYMENT_V2_FILTER_IMPORT: integrated production modules + new Dashboard/My Task/Workflow -->
 <!-- WOW_BEAUTY_PASSWORD_RECOVERY_V1: recovery email -> set new password -> sign out -> login -->
-<!-- WOW_BEAUTY_PAYMENT_INVOICE_CONTROL_V3 -->
+<!-- WOW_BEAUTY_PAYMENT_INVOICE_CONTROL_V3_1_DB_SAVE_MODAL_DASHBOARD -->
 </head>
 <body><a class="portal-return-btn" href="../">← Management Portal</a>
 <section id="loginScreen" class="login-screen">
@@ -726,6 +726,21 @@ button.confirm-delete{background:#b42318!important;color:#fff!important;border-c
     <div class="card stat dashboard-risk-stat"><div class="small">Overdue</div><div class="v" id="statRisk">0</div><div class="dashboard-stat-note">Past target date</div></div>
   </div>
 
+
+  <div class="card panel" style="margin-bottom:16px">
+    <div class="toolbar">
+      <div><h2>Pending Payment Summary</h2><div class="small">Live from Payment List / Invoice Tracker. Due status is calculated from Due Date.</div></div>
+      <button class="secondary" onclick="page('invoices',document.getElementById('invoiceTrackerNav'))">Open Invoice Tracker</button>
+    </div>
+    <div class="invoice-summary">
+      <div class="invoice-kpi"><span class="small">Pending / Due Soon</span><b id="dashPaymentPendingCount">0</b></div>
+      <div class="invoice-kpi"><span class="small">Overdue</span><b id="dashPaymentOverdueCount">0</b></div>
+      <div class="invoice-kpi"><span class="small">Outstanding Amount</span><b id="dashPaymentOutstanding">RM 0.00</b></div>
+      <div class="invoice-kpi"><span class="small">Due Within 7 Days</span><b id="dashPaymentDueSoon">0</b></div>
+    </div>
+    <div id="dashboardPaymentItems"></div>
+  </div>
+
   <div class="card panel" style="margin-bottom:16px">
     <div class="toolbar">
       <div>
@@ -859,6 +874,27 @@ button.confirm-delete{background:#b42318!important;color:#fff!important;border-c
   </div>
 </section>
 
+
+
+<div id="addInvoiceModal" class="modal hidden">
+ <div class="modal-card" style="width:min(720px,calc(100vw - 36px))">
+  <h2>Add Invoice</h2>
+  <div class="small" style="margin-bottom:14px">Create and save the invoice directly to Supabase. The same record will appear in Payment List.</div>
+  <div class="form-grid">
+   <div><label>Store *</label><select id="newInvStore"></select></div>
+   <div><label>Invoice / Item *</label><input id="newInvItem" placeholder="e.g. October Rental / Electricity"></div>
+   <div><label>Invoice No.</label><input id="newInvNo" placeholder="Invoice number"></div>
+   <div><label>Amount (RM) *</label><input id="newInvAmount" type="number" step="0.01" min="0" placeholder="0.00"></div>
+   <div><label>Invoice Date</label><input id="newInvDate" type="date"></div>
+   <div><label>Received Date</label><input id="newInvReceived" type="date"></div>
+   <div><label>Due Date *</label><input id="newInvDue" type="date"></div>
+   <div><label>Account Date</label><input id="newInvAccount" type="date"></div>
+   <div class="full"><label>Comment</label><textarea id="newInvComment" placeholder="Optional note / reference"></textarea></div>
+  </div>
+  <div id="newInvMsg" class="small" style="margin-top:10px"></div>
+  <div class="modal-actions-row"><button class="secondary" onclick="closeAddInvoiceModal()">Cancel</button><button id="newInvSaveBtn" class="primary" onclick="saveNewInvoice()">Save Invoice</button></div>
+ </div>
+</div>
 
 <section id="page-invoices" class="hidden">
  <div class="toolbar"><div><h1>Invoice Tracker</h1><div class="small">Invoice due control synced with Payment List. No duplicate payment record is created.</div></div>
@@ -2549,22 +2585,63 @@ async function saveInvoiceRecord(pid,i){
  p.date=p.paymentDate;p.accountDate=p.accountDate||p.invoiceDate||p.receivedDate||'';
  if(p.paymentDate&&p.status==='Pending')p.status='Paid';
  try{
-   await wbSavePayment(pid,p);delete invoiceEdit[`${pid}_${i}`];
-   renderInvoiceTracker();renderCentralPayments();
-   wbShowSyncNotice('Invoice / payment record saved online.','success',1500);
+   await wbSavePayment(pid,p);
+   const {data:verified,error:verifyError}=await supabaseClient.from('wb_payments').select('id').eq('id',Number(p.id)).maybeSingle();
+   if(verifyError)throw verifyError;
+   if(!verified)throw new Error('Database verification failed after update.');
+   delete invoiceEdit[`${pid}_${i}`];
+   renderInvoiceTracker();renderCentralPayments();renderDashboard();
+   wbShowSyncNotice('Invoice / payment record saved to database.','success',1500);
  }catch(e){Object.assign(p,before);wbSyncError('Invoice sync failed',e)}
 }
 function addInvoiceRecord(){
- let pid=$('invoiceStoreFilter')?.value;
- if(!pid||pid==='ALL'){
-   const paymentStore=$('paymentStoreFilter')?.value;
-   if(paymentStore&&paymentStore!=='ALL')pid=paymentStore;
+ const sf=$('invoiceStoreFilter'), current=sf?.value||'ALL';
+ const sel=$('newInvStore');
+ if(sel){
+   sel.innerHTML='<option value="">Select Store</option>'+allStoreRecords().map(s=>`<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('');
+   if(current!=='ALL'&&[...sel.options].some(o=>o.value===current))sel.value=current;
  }
- if(!pid||pid==='ALL')return alert('Please select a specific Store before adding an invoice.');
- pid=+pid;const s=storeInfoData[pid];if(!s)return alert('Selected store could not be found.');
- s.payments=s.payments||[];
- s.payments.push({id:wbNewId(),item:'',amount:'',accountDate:'',paymentDate:'',date:'',status:'Pending',comment:'',invoiceNo:'',invoiceDate:'',receivedDate:'',dueDate:'',attachments:[]});
- const i=s.payments.length-1;invoiceEdit[`${pid}_${i}`]=deepClone(s.payments[i]);renderInvoiceTracker();
+ ['newInvItem','newInvNo','newInvAmount','newInvDate','newInvReceived','newInvDue','newInvAccount','newInvComment'].forEach(id=>{if($(id))$(id).value=''});
+ if($('newInvMsg'))$('newInvMsg').textContent='';
+ $('addInvoiceModal')?.classList.remove('hidden');
+ setTimeout(()=>$('newInvItem')?.focus(),50);
+}
+function closeAddInvoiceModal(){$('addInvoiceModal')?.classList.add('hidden')}
+async function saveNewInvoice(){
+ const pid=Number($('newInvStore')?.value||0);
+ const item=($('newInvItem')?.value||'').trim();
+ const amount=parseFloat($('newInvAmount')?.value||'');
+ const dueDate=$('newInvDue')?.value||'';
+ const msg=$('newInvMsg'),btn=$('newInvSaveBtn');
+ if(!pid)return msg&&(msg.textContent='Please select a Store.');
+ if(!item)return msg&&(msg.textContent='Invoice / Item is required.');
+ if(!Number.isFinite(amount))return msg&&(msg.textContent='Please enter a valid Amount.');
+ if(!dueDate)return msg&&(msg.textContent='Due Date is required.');
+ const s=storeInfoData[pid];if(!s)return msg&&(msg.textContent='Selected store could not be found.');
+ const p={id:wbNewId(),item,amount,
+   accountDate:$('newInvAccount')?.value||$('newInvDate')?.value||'',
+   paymentDate:'',date:'',status:'Pending',
+   comment:$('newInvComment')?.value||'',
+   invoiceNo:$('newInvNo')?.value||'',
+   invoiceDate:$('newInvDate')?.value||'',
+   receivedDate:$('newInvReceived')?.value||'',
+   dueDate,attachments:[]};
+ try{
+   if(btn){btn.disabled=true;btn.textContent='Saving...'}
+   if(msg){msg.textContent='Saving to database...';msg.style.color=''}
+   await wbSavePayment(pid,p);
+   // Verify that the exact row is readable after upsert; avoids a false "saved" state.
+   const {data:verified,error:verifyError}=await supabaseClient.from('wb_payments').select('id,store_id').eq('id',Number(p.id)).eq('store_id',pid).maybeSingle();
+   if(verifyError)throw verifyError;
+   if(!verified)throw new Error('Database verification failed. The invoice was not found after saving.');
+   s.payments=s.payments||[];s.payments.push(p);
+   closeAddInvoiceModal();
+   renderInvoiceTracker();renderCentralPayments();renderDashboard();
+   wbShowSyncNotice('Invoice saved to database and synced to Payment List.','success',2200);
+ }catch(e){
+   console.error('Add invoice database save failed:',e);
+   if(msg){msg.textContent='Save failed: '+(e?.message||'Unknown database error');msg.style.color='#be3834'}
+ }finally{if(btn){btn.disabled=false;btn.textContent='Save Invoice'}}
 }
 
 
@@ -3608,6 +3685,32 @@ function renderDashboard(){
  if($('statReturned'))$('statReturned').textContent=submitted;
  if($('statApproved'))$('statApproved').textContent=completed;
  if($('statRisk'))$('statRisk').textContent=overdue;
+
+ // Payment / invoice summary
+ const paymentRows=[];
+ allStoreRecords().forEach(store=>{
+   const s=storeInfoData[store.id];if(!s)return;
+   (s.payments||[]).forEach(pay=>{
+     if(pay._deleteOnSave)return;
+     const derived=typeof wbInvoiceDerivedStatus==='function'?wbInvoiceDerivedStatus(pay):(pay.status||'Pending');
+     if(!['Paid','Waived'].includes(derived))paymentRows.push({store,pay,derived});
+   });
+ });
+ const paymentOverdue=paymentRows.filter(x=>x.derived==='Overdue');
+ const paymentDueSoon=paymentRows.filter(x=>x.derived==='Due Soon');
+ if($('dashPaymentPendingCount'))$('dashPaymentPendingCount').textContent=paymentRows.length;
+ if($('dashPaymentOverdueCount'))$('dashPaymentOverdueCount').textContent=paymentOverdue.length;
+ if($('dashPaymentDueSoon'))$('dashPaymentDueSoon').textContent=paymentDueSoon.length;
+ if($('dashPaymentOutstanding'))$('dashPaymentOutstanding').textContent='RM '+paymentRows.reduce((a,x)=>a+Number(x.pay.amount||0),0).toFixed(2);
+ paymentRows.sort((a,b)=>{
+   const rank=x=>x.derived==='Overdue'?0:x.derived==='Due Soon'?1:2;
+   return rank(a)-rank(b)||String(a.pay.dueDate||'9999-12-31').localeCompare(String(b.pay.dueDate||'9999-12-31'));
+ });
+ if($('dashboardPaymentItems'))$('dashboardPaymentItems').innerHTML=paymentRows.length?paymentRows.slice(0,10).map(x=>`
+   <div class="dashboard-alert ${x.derived==='Overdue'?'danger':x.derived==='Due Soon'?'warning':'info'}">
+    <div class="dashboard-alert-title"><b>${escapeHtml(x.pay.item||'Payment')}</b><span class="badge ${x.derived==='Overdue'?'bad':'warn'}">${escapeHtml(x.derived)}</span></div>
+    <div class="dashboard-alert-meta">${escapeHtml(x.store.name)} · RM ${Number(x.pay.amount||0).toFixed(2)} · Due ${escapeHtml(x.pay.dueDate||'Not set')}${x.pay.invoiceNo?' · Invoice '+escapeHtml(x.pay.invoiceNo):''}</div>
+   </div>`).join(''):'<div class="proto-empty">No pending payments.</div>';
 
  if($('projectCards'))$('projectCards').innerHTML=projects.map(p=>{
    const m=dashboardProjectMetrics(p);
