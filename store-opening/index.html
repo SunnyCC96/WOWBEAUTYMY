@@ -577,7 +577,7 @@ button.confirm-delete{background:#b42318!important;color:#fff!important;border-c
 </style>
 <!-- WOW_BEAUTY_STORE_OPENING_PAYMENT_V2_FILTER_IMPORT: integrated production modules + new Dashboard/My Task/Workflow -->
 <!-- WOW_BEAUTY_PASSWORD_RECOVERY_V1: recovery email -> set new password -> sign out -> login -->
-<!-- WOW_BEAUTY_PAYMENT_INVOICE_CONTROL_V3_2_STORE_SUPABASE_RECONCILIATION -->
+<!-- WOW_BEAUTY_PAYMENT_INVOICE_CONTROL_V3_3_1_ACCOUNT_DATE_SORT -->
 </head>
 <body><a class="portal-return-btn" href="../">← Management Portal</a>
 <section id="loginScreen" class="login-screen">
@@ -2431,6 +2431,13 @@ function renderCentralPayments(){
      rows.push({p,s,pay,i});
    });
  });
+ rows.sort((a,b)=>{
+   // Payment List default order: newest Account Date first.
+   const aa=String(a.pay.accountDate||'');
+   const ba=String(b.pay.accountDate||'');
+   if(aa!==ba)return ba.localeCompare(aa);
+   return Number(b.pay.id||0)-Number(a.pay.id||0);
+ });
 
  $('centralPaymentRows').innerHTML=rows.map(({p,pay,i})=>{
    const key=`${p.id}_${i}`;
@@ -2987,16 +2994,9 @@ async function loadCoreDataFromSupabase(){
  if(tr.error)throw tr.error;
  if(dr.error)throw dr.error;
 
- // First deployment only: Super Admin bootstraps the current live data into Supabase.
- if(!pr.data?.length){
-   if(!dashboardIsSuperAdmin()){
-     throw new Error('Core data is not initialized yet. Please sign in once with Super Admin to complete setup.');
-   }
-   await wbBootstrapCoreData();
-   return loadCoreDataFromSupabase();
- }
-
- projects.splice(0,projects.length,...pr.data.map(wbProjectFromRow));
+ // Supabase is the source of truth, including a legitimately empty project list.
+ // Do NOT re-bootstrap hard-coded/browser projects after Super Admin deletes the last project.
+ projects.splice(0,projects.length,...(pr.data||[]).map(wbProjectFromRow));
 
  // Replace prototype project tasks with database state.
  Object.keys(protoProjectTasks).forEach(k=>delete protoProjectTasks[k]);
@@ -3558,7 +3558,9 @@ async function dashboardDeleteProject(projectId){
    if(idx>=0)projects.splice(idx,1);
    delete protoProjectTasks[pid]; delete protoProjectTasks[String(pid)];
    if(typeof storeInfoData!=='undefined' && storeInfoData[pid]?.source==='Project')delete storeInfoData[pid];
-   protoPopulateProjects();renderProtoTasks();renderProtoWorkflow();renderDashboard();renderPendingTasks();
+   await loadCoreDataFromSupabase();
+   await loadStorePaymentDataFromSupabase();
+   protoPopulateProjects();renderAll();
  }catch(e){wbSyncError('Project delete failed',e)}
 }
 
@@ -4032,9 +4034,12 @@ async function deleteProject(id,confirmed=false){
    try{closeM('projectModal')}catch(e){}
 
    // Refresh current synced UI.
+   // Re-read Supabase after delete so the browser cannot keep a stale Store/Project copy.
+   try{await loadCoreDataFromSupabase()}catch(e){console.warn('Core reload after delete:',e)}
+   try{await loadStorePaymentDataFromSupabase()}catch(e){console.warn('Store reload after delete:',e)}
    try{protoPopulateProjects()}catch(e){}
    try{populateSelects()}catch(e){}
-   try{wbRenderVisiblePage()}catch(e){console.warn(e)}
+   try{renderAll()}catch(e){console.warn(e)}
 
    if(btn){
      btn.dataset.confirm='0';
