@@ -577,7 +577,7 @@ button.confirm-delete{background:#b42318!important;color:#fff!important;border-c
 </style>
 <!-- WOW_BEAUTY_STORE_OPENING_PAYMENT_V2_FILTER_IMPORT: integrated production modules + new Dashboard/My Task/Workflow -->
 <!-- WOW_BEAUTY_PASSWORD_RECOVERY_V1: recovery email -> set new password -> sign out -> login -->
-<!-- WOW_BEAUTY_PAYMENT_INVOICE_CONTROL_V3_1_DB_SAVE_MODAL_DASHBOARD -->
+<!-- WOW_BEAUTY_PAYMENT_INVOICE_CONTROL_V3_2_STORE_SUPABASE_RECONCILIATION -->
 </head>
 <body><a class="portal-return-btn" href="../">← Management Portal</a>
 <section id="loginScreen" class="login-screen">
@@ -1526,11 +1526,41 @@ async function wbSaveStore(s){
  const {error}=await supabaseClient.from('wb_store_info').upsert(row,{onConflict:'id'});
  if(error)throw error;
 }
+async function wbEnsureProjectStoreOnline(projectId){
+ const pid=Number(projectId);
+ if(!pid)return false;
+ const {data,error}=await supabaseClient.rpc('wb_ensure_project_store',{p_project_id:pid});
+ if(error)throw error;
+ return data===true;
+}
+async function wbReconcileProjectStoresOnline(){
+ if(!projects?.length)return;
+ const missing=projects.filter(p=>!storeInfoData[Number(p.id)]);
+ for(const p of missing){
+   try{await wbEnsureProjectStoreOnline(p.id)}
+   catch(e){console.warn('Store reconciliation skipped for project',p.id,e)}
+ }
+ if(missing.length){
+   const {data,error}=await supabaseClient.from('wb_store_info').select('*').order('id');
+   if(error)throw error;
+   (data||[]).forEach(r=>{
+     const s=wbStoreFromRow(r);
+     const existing=storeInfoData[s.id]?.payments||[];
+     s.payments=existing;
+     storeInfoData[s.id]=s;
+   });
+ }
+}
 async function wbDeleteStore(id){
  const {error}=await supabaseClient.from('wb_store_info').delete().eq('id',Number(id));
  if(error)throw error;
 }
 async function wbSavePayment(storeId,p){
+ const sid=Number(storeId);
+ const localStore=storeInfoData[sid];
+ if(localStore?.source==='Project' || localStore?.projectId!=null || projects.some(x=>Number(x.id)===sid)){
+   await wbEnsureProjectStoreOnline(localStore?.projectId||sid);
+ }
  if(!p.id)p.id=wbNewId();
  const paymentDate=p.paymentDate||p.date||null;
  const accountDate=p.accountDate||paymentDate||null;
@@ -1697,14 +1727,10 @@ async function loadStorePaymentDataFromSupabase(){
    }
  });
 
- // First online initialization: create project-linked store records once.
+ // Reconcile project-linked Store Information records on every sync.
+ // This repairs old/missing store rows and keeps future project additions aligned with Supabase.
  syncStoreInfoFromProjects();
- if(!(stores||[]).length && dashboardIsSuperAdmin()){
-   for(const p of projects){
-     const s=storeInfoData[p.id];
-     if(s)await wbSaveStore({...s,id:p.id});
-   }
- }
+ await wbReconcileProjectStoresOnline();
 
  wbStorePaymentLoaded=true;
  wbRefreshAccessState();
@@ -3522,7 +3548,7 @@ async function dashboardDeleteProject(projectId){
  const pid=Number(projectId);
  const p=projects.find(x=>Number(x.id)===pid);
  if(!p)return alert('Project not found.');
- if(!window.confirm(`Delete project "${p.name}"?\n\nThis will remove the project and all related tasks from Supabase.`))return;
+ if(!window.confirm(`Delete project "${p.name}"?\n\nThis will remove the project, linked Store Information, related payments/invoices and tasks from Supabase.`))return;
 
  const attachmentPaths=wbProjectAttachmentPaths(pid);
  try{
@@ -4046,7 +4072,8 @@ async function saveProject(){
      protoSeedProject(obj.id);
      try{
        for(const t of protoAllTasks(obj.id))await wbSaveTask(t);
-       syncStoreInfoFromProjects();if(storeInfoData[obj.id])await wbSaveStore({...storeInfoData[obj.id],id:obj.id});
+       syncStoreInfoFromProjects();
+       if(storeInfoData[obj.id])await wbSaveStore({...storeInfoData[obj.id],id:obj.id});
      }catch(taskErr){
        // Avoid a half-created project when default task creation fails.
        await wbDeleteProject(obj.id).catch(()=>{});
@@ -4054,6 +4081,11 @@ async function saveProject(){
        delete protoProjectTasks[obj.id];delete protoProjectTasks[String(obj.id)];
        throw taskErr;
      }
+   }
+   // Keep Store Information in Supabase aligned when an existing project/store is renamed or edited.
+   if(!isNew){
+     syncStoreInfoFromProjects();
+     if(storeInfoData[obj.id])await wbSaveStore({...storeInfoData[obj.id],id:obj.id});
    }
    closeM('projectEditorModal');renderAll();
  }catch(e){
