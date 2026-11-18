@@ -1265,6 +1265,7 @@ async function forgotPassword(e){
    const recoveryUrl=new URL(location.href);
    recoveryUrl.hash='';
    recoveryUrl.search='';
+   recoveryUrl.searchParams.set('recovery','1');
    const {error}=await supabaseClient.auth.resetPasswordForEmail(email,{redirectTo:recoveryUrl.toString()});
    if(error)throw error;
    alert('Password reset email sent. Please check your inbox.');
@@ -1277,6 +1278,22 @@ async function forgotPassword(e){
 initLoginCover();
 
 let wbPasswordRecoveryMode=false;
+// Keep the recovery intent even if Supabase consumes URL tokens before bootstrap.
+const wbRecoveryIntent = (()=>{
+  const q=new URLSearchParams(location.search);
+  const h=new URLSearchParams(location.hash.replace(/^#/,''));
+  return q.get('recovery')==='1' || q.get('type')==='recovery' || h.get('type')==='recovery';
+})();
+function wbClearRecoveryUrl(){
+  const url=new URL(location.href);
+  url.searchParams.delete('recovery');
+  url.searchParams.delete('type');
+  url.searchParams.delete('code');
+  url.searchParams.delete('token_hash');
+  url.hash='';
+  history.replaceState(null,'',url.pathname+url.search);
+}
+
 
 function wbShowPasswordRecovery(){
   wbPasswordRecoveryMode=true;
@@ -1314,6 +1331,7 @@ async function wbUpdateRecoveredPassword(){
     if(msg){msg.textContent='Password updated successfully. Signing you out...';msg.style.color='#118456'}
     await new Promise(r=>setTimeout(r,700));
     await supabaseClient.auth.signOut();
+    wbClearRecoveryUrl();
     wbPasswordRecoveryMode=false;
     $('passwordRecoveryModal')?.classList.add('hidden');
     $('app')?.classList.add('hidden');
@@ -1329,8 +1347,8 @@ async function wbUpdateRecoveredPassword(){
 }
 
 // Supabase emits PASSWORD_RECOVERY after the email recovery link establishes a recovery session.
-supabaseClient.auth.onAuthStateChange((event)=>{
-  if(event==='PASSWORD_RECOVERY'){
+supabaseClient.auth.onAuthStateChange((event,session)=>{
+  if(event==='PASSWORD_RECOVERY' || (wbRecoveryIntent && session && (event==='SIGNED_IN'||event==='INITIAL_SESSION'))){
     setTimeout(wbShowPasswordRecovery,0);
   }
 });
@@ -5293,9 +5311,17 @@ setInterval(()=>{
 async function wbPortalSessionBootstrap(){
  try{
    // Give Supabase a moment to emit PASSWORD_RECOVERY before normal session bootstrap.
-   await new Promise(r=>setTimeout(r,250));
+   await new Promise(r=>setTimeout(r,400));
    if(wbPasswordRecoveryMode)return;
    const {data:{session}}=await supabaseClient.auth.getSession();
+   if(wbRecoveryIntent){
+     if(session?.user?.id){wbShowPasswordRecovery();return;}
+     $('app')?.classList.add('hidden');
+     $('loginScreen')?.classList.remove('hidden');
+     alert('Recovery link could not be verified. Please request a new password reset email.');
+     wbClearRecoveryUrl();
+     return;
+   }
    if(!session?.user?.id)return;
    const {data:profile,error}=await supabaseClient
      .from('Profile')
