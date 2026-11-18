@@ -17,7 +17,7 @@
 .login-side{display:flex;align-items:center;justify-content:center;padding:40px} .card{width:min(500px,100%);background:#fff;border:1px solid var(--line);border-radius:26px;padding:34px;box-shadow:0 22px 60px rgba(93,44,61,.13)}
 h2{margin:0 0 7px;font-size:29px} .sub{color:var(--muted);margin-bottom:28px;line-height:1.5}
 label{font-size:12px;font-weight:800;color:#66565e;display:block;margin:14px 0 7px} input{width:100%;border:1px solid #e7d7dc;border-radius:12px;padding:13px 14px;font-size:14px;outline:none} input:focus{border-color:#df7792;box-shadow:0 0 0 3px rgba(228,91,123,.09)}
-button{border:0;border-radius:12px;padding:13px 16px;font-weight:800;cursor:pointer} .primary{width:100%;background:var(--pink);color:#fff;margin-top:20px} .primary:disabled{opacity:.6} .err{margin-top:12px;color:#bc3c5e;font-size:13px}
+button{border:0;border-radius:12px;padding:13px 16px;font-weight:800;cursor:pointer} .primary{width:100%;background:var(--pink);color:#fff;margin-top:20px} .primary:disabled{opacity:.6} .text-link{display:block;margin:12px auto 0;background:none;color:#c7486b;text-decoration:underline;padding:8px} .err{margin-top:12px;color:#bc3c5e;font-size:13px}
 .portal{min-height:100vh;padding:38px clamp(22px,5vw,72px);background:#f8fafc} .top{display:flex;justify-content:space-between;align-items:center;gap:20px;margin-bottom:38px} .user{color:#68788b;font-size:13px} .logout{background:#fff;border:1px solid #dde4ec;color:#53677b;padding:9px 13px}
 .portal h1{font-size:32px;margin:0 0 5px} .workspace-grid{display:grid;grid-template-columns:repeat(2,minmax(280px,1fr));gap:22px;max-width:1050px}
 .workspace{background:#fff;border:1px solid #e3eaf1;border-radius:22px;padding:26px;text-decoration:none;color:inherit;box-shadow:0 8px 26px rgba(32,58,83,.07);transition:.18s;position:relative;overflow:hidden}
@@ -40,9 +40,28 @@ button{border:0;border-radius:12px;padding:13px 16px;font-weight:800;cursor:poin
    <label>EMAIL</label><input id="email" type="email" autocomplete="username" required>
    <label>PASSWORD</label><input id="password" type="password" autocomplete="current-password" required>
    <button id="loginBtn" class="primary">Login to Portal</button>
+   <button type="button" class="text-link" onclick="showForgot()">Forgot Password?</button>
    <div id="err" class="err"></div>
   </form>
  </div>
+</section>
+<section id="forgot" class="shell hidden">
+ <div class="brand"><div><div class="logo">WOW <span>BEAUTY</span></div><h1>Reset your password</h1><p>Request a secure password reset email.</p></div></div>
+ <div class="login-side"><form class="card" onsubmit="event.preventDefault();sendReset()">
+ <h2>Forgot Password</h2><div class="sub">Enter your account email. We will send you a password reset link.</div>
+ <label>EMAIL</label><input id="resetEmail" type="email" autocomplete="email" required>
+ <button id="sendResetBtn" class="primary">Send Reset Link</button>
+ <button type="button" class="text-link" onclick="showLogin()">Back to Login</button><div id="forgotMsg" class="err" role="status"></div>
+ </form></div>
+</section>
+<section id="recovery" class="shell hidden">
+ <div class="brand"><div><div class="logo">WOW <span>BEAUTY</span></div><h1>Set a new password</h1><p>Choose a new password and confirm it before returning to login.</p></div></div>
+ <div class="login-side"><form class="card" onsubmit="event.preventDefault();saveNewPassword()">
+ <h2>Set New Password</h2><div class="sub">Enter your new password twice. You will not be signed in automatically.</div>
+ <label>NEW PASSWORD</label><input id="newPassword" type="password" minlength="8" maxlength="128" autocomplete="new-password" required>
+ <label>CONFIRM NEW PASSWORD</label><input id="confirmPassword" type="password" minlength="8" maxlength="128" autocomplete="new-password" required>
+ <button id="savePasswordBtn" class="primary">Confirm &amp; Reset Password</button><div id="recoveryMsg" class="err" role="status"></div>
+ </form></div>
 </section>
 
 <section id="portal" class="portal hidden">
@@ -79,7 +98,60 @@ async function login(){
  try{const {data,error}=await sb.auth.signInWithPassword({email:$('email').value.trim(),password:$('password').value});if(error)throw error;showPortal(await getProfile(data.user));}
  catch(e){$('err').textContent='Login failed: '+(e?.message||e)}finally{b.disabled=false;b.textContent='Login to Portal';}
 }
+const panels=['login','forgot','recovery','portal'];
+let recoveryMode = new URLSearchParams(location.search).get('recovery')==='1' || /(?:^|[&#])type=recovery(?:&|$)/.test(location.hash) || new URLSearchParams(location.search).get('type')==='recovery';
+let recoveryReady=false;
+function showPanel(name){for(const id of panels)$(id).classList.toggle('hidden',id!==name)}
+function showForgot(){$('forgotMsg').textContent='';$('resetEmail').value=$('email').value;showPanel('forgot')}
+function showLogin(){if(recoveryMode)return;showPanel('login')}
+function cleanRecoveryUrl(){history.replaceState({},'',location.pathname);}
+async function sendReset(){
+ const b=$('sendResetBtn');b.disabled=true;$('forgotMsg').textContent='';
+ try{
+  const redirect=new URL(location.origin+location.pathname);redirect.searchParams.set('recovery','1');
+  const {error}=await sb.auth.resetPasswordForEmail($('resetEmail').value.trim(),{redirectTo:redirect.toString()});
+  if(error)throw error;
+  $('forgotMsg').style.color='#247653';$('forgotMsg').textContent='If this email is registered, check your inbox for the reset link.';
+ }catch(e){$('forgotMsg').style.color='#bc3c5e';$('forgotMsg').textContent=e?.message||'Unable to send reset email';}
+ finally{b.disabled=false}
+}
+async function saveNewPassword(){
+ if(!recoveryMode || !recoveryReady){$('recoveryMsg').textContent='Reset session is not ready. Please request a new reset link.';return}
+ const pw=$('newPassword').value;
+ if(pw.length<8 || pw!==$('confirmPassword').value){$('recoveryMsg').textContent='Passwords must match and contain at least 8 characters.';return}
+ const b=$('savePasswordBtn');b.disabled=true;$('recoveryMsg').textContent='';
+ try{
+  const {error}=await sb.auth.updateUser({password:pw});if(error)throw error;
+  // The recovery token creates a temporary authenticated session; end it after reset.
+  await sb.auth.signOut();recoveryMode=false;recoveryReady=false;cleanRecoveryUrl();
+  $('password').value='';$('newPassword').value='';$('confirmPassword').value='';
+  showPanel('login');$('err').style.color='#247653';$('err').textContent='Password reset successful. Please log in with your new password.';
+ }catch(e){$('recoveryMsg').textContent=e?.message||'Password reset failed';}
+ finally{b.disabled=false}
+}
+sb.auth.onAuthStateChange((event,session)=>{
+ if(event==='PASSWORD_RECOVERY'){
+  recoveryMode=true;recoveryReady=!!session;showPanel('recovery');
+ }else if(recoveryMode && session && (event==='SIGNED_IN'||event==='INITIAL_SESSION')){
+  recoveryReady=true;showPanel('recovery');
+ }
+});
 async function logout(){await sb.auth.signOut();location.reload();}
-(async()=>{try{const {data:{session}}=await sb.auth.getSession();if(session?.user)showPortal(await getProfile(session.user));}catch(e){console.warn(e)}})();
+(async()=>{
+ if(recoveryMode){
+  showPanel('recovery');
+  $('recoveryMsg').textContent='Validating reset link...';
+  try{
+   // Allow Supabase to exchange the recovery token before checking session.
+   await new Promise(resolve=>setTimeout(resolve,700));
+   const {data:{session}}=await sb.auth.getSession();
+   recoveryReady=!!session;
+   $('recoveryMsg').textContent=session?'':'Reset link invalid or expired. Return to the login page and request a new link.';
+  }catch(e){$('recoveryMsg').textContent='Unable to validate reset link. Please request a new one.'}
+  return;
+ }
+ try{const {data:{session}}=await sb.auth.getSession();if(session?.user)showPortal(await getProfile(session.user));}
+ catch(e){console.warn(e)}
+})();
 </script>
 </body></html>
