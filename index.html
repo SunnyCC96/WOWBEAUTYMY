@@ -25,6 +25,7 @@ button{border:0;border-radius:12px;padding:13px 16px;font-weight:800;cursor:poin
 .icon{width:50px;height:50px;border-radius:15px;background:#fff0f4;display:grid;place-items:center;font-size:23px;margin-bottom:22px} .workspace h3{font-size:21px;margin:0 0 8px} .workspace p{color:#718094;line-height:1.55;margin:0 0 22px;font-size:14px} .go{font-weight:800;color:#cf4f70;font-size:13px}
 .badge{position:absolute;right:18px;top:18px;background:#eef8f3;color:#2c8b62;padding:5px 9px;border-radius:999px;font-size:11px;font-weight:800}
 .badge.dev{background:#fff5df;color:#a26d16}
+ .top-actions{display:flex;gap:10px;flex-wrap:wrap}.panel{max-width:1050px;background:white;border:1px solid #e3eaf1;border-radius:20px;padding:24px;margin:22px 0}.panel h2{font-size:22px}.fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 18px}.fields input,.fields select{width:100%;padding:12px;border:1px solid #e7d7dc;border-radius:12px;background:white}.action{background:#e45b7b;color:white;margin-top:15px}.secondary{background:#f5f6f8;border:1px solid #dfe4eb;color:#344054}.notice{font-size:13px;margin-top:12px;white-space:pre-wrap}.admin-list{width:100%;border-collapse:collapse;margin-top:14px}.admin-list td,.admin-list th{border-bottom:1px solid #eee;padding:10px;text-align:left;font-size:13px}.table-wrap{overflow-x:auto}.muted{color:#68788b;font-size:13px}.panel select{font-size:14px}.danger{color:#b42318}.panel button:disabled{opacity:.5;cursor:wait}@media(max-width:600px){.fields{grid-template-columns:1fr}.top{align-items:flex-start;flex-direction:column}.panel{padding:17px}}
 @media(max-width:850px){.shell{grid-template-columns:1fr}.brand{min-height:330px;padding:36px}.brand h1{font-size:40px}.workspace-grid{grid-template-columns:1fr}}
 </style>
 </head>
@@ -48,7 +49,24 @@ button{border:0;border-radius:12px;padding:13px 16px;font-weight:800;cursor:poin
 <section id="portal" class="portal hidden">
  <div class="top">
   <div><div class="logo" style="font-size:27px">WOW <span style="font-size:15px">BEAUTY</span></div><h1>Management Portal</h1><div class="user" id="userInfo"></div></div>
-  <button class="logout" onclick="logout()">Log Out</button>
+  <div class="top-actions"><button class="logout" onclick="toggleSettings()">⚙ User Settings</button><button class="logout" onclick="logout()">Log Out</button></div>
+ </div>
+ <div id="settings" class="hidden">
+  <div class="panel"><h2>My Profile</h2><p class="muted">Your email and access permissions are read-only here.</p>
+   <div class="fields"><div><label>USERNAME / DISPLAY NAME</label><input id="myName" maxlength="100"></div><div><label>EMAIL</label><input id="myEmail" disabled></div><div><label>ROLE</label><input id="myRole" disabled></div><div><label>DEPARTMENT</label><input id="myDept" disabled></div></div>
+   <button class="action" onclick="saveMyName()">Save Username</button><div id="profileMsg" class="notice" role="status"></div>
+  </div>
+  <div class="panel"><h2>Change My Password</h2><p class="muted">Change the password of your currently signed-in account.</p>
+   <div class="fields"><div><label>NEW PASSWORD</label><input id="myPass" type="password" autocomplete="new-password" minlength="8"></div><div><label>CONFIRM PASSWORD</label><input id="myPassConfirm" type="password" autocomplete="new-password" minlength="8"></div></div>
+   <button class="action" onclick="saveMyPassword()">Update Password</button><div id="passwordMsg" class="notice" role="status"></div>
+  </div>
+  <div id="adminPanel" class="panel hidden"><h2>Super Admin · User Management</h2><p class="muted">Manage usernames, roles, departments and reset passwords for other accounts.</p>
+   <label>SEARCH USERS</label><input id="userSearch" placeholder="Search name or email" oninput="renderUsers()">
+   <div class="table-wrap"><table class="admin-list"><thead><tr><th>Username</th><th>Email</th><th>Role</th><th>Department</th><th>Action</th></tr></thead><tbody id="userRows"></tbody></table></div>
+   <div id="adminEditor" class="hidden"><h3>Edit Selected User</h3><div class="fields"><div><label>EMAIL (READ ONLY)</label><input id="editEmail" disabled></div><div><label>USERNAME</label><input id="editName" maxlength="100"></div><div><label>ROLE</label><select id="editRole"><option>Super Admin</option><option>Management</option><option>User</option></select></div><div><label>DEPARTMENT</label><select id="editDept"><option>HR</option><option>Marketing</option><option>Merchandise</option><option>Operations</option><option>Finance</option><option>IT</option><option>BD</option></select></div></div>
+    <button class="action" onclick="saveAdminProfile()">Save User Details</button><h3>Reset User Password</h3><div class="fields"><div><label>NEW TEMPORARY PASSWORD</label><input id="editPass" type="password" autocomplete="new-password" minlength="8"></div><div><label>CONFIRM PASSWORD</label><input id="editPassConfirm" type="password" autocomplete="new-password" minlength="8"></div></div><button class="secondary" style="margin-top:14px" onclick="adminResetPassword()">Reset Password</button><div id="adminMsg" class="notice" role="status"></div>
+   </div>
+  </div>
  </div>
  <div class="workspace-grid">
    <a class="workspace" href="./store-opening/">
@@ -65,13 +83,31 @@ button{border:0;border-radius:12px;padding:13px 16px;font-weight:800;cursor:poin
 const SUPABASE_URL="https://lgbbwsexntgnweynprnt.supabase.co",SUPABASE_KEY="sb_publishable_SHwnSjppV052CsfpHeE7Gw_6Ip48gCS";
 const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const $=id=>document.getElementById(id);
+let currentProfile=null,users=[],selectedUserId=null;
+const isSuperAdmin=p=>String(p?.role||'').toLowerCase().replace(/[\s_-]/g,'')==='superadmin';
+function msg(id,t,err=false){$(id).textContent=t;$(id).style.color=err?'#b42318':'#24704e';}
+async function callAdmin(action,payload={}){
+ const {data:{session},error:sessionError}=await sb.auth.getSession();
+ if(sessionError||!session)throw new Error('Please log in again.');
+ const res=await fetch(`${SUPABASE_URL}/functions/v1/portal-user-management`,{method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':`Bearer ${session.access_token}`},body:JSON.stringify({action,...payload})});
+ const body=await res.json().catch(()=>({}));if(!res.ok)throw new Error(body.error||`Request failed (${res.status})`);return body;
+}
+function toggleSettings(){const hidden=$('settings').classList.toggle('hidden');if(!hidden&&isSuperAdmin(currentProfile))loadUsers();}
+function fillMyProfile(p){$('myName').value=p.name||'';$('myEmail').value=p.email||'';$('myRole').value=p.role||'';$('myDept').value=p.department||'';$('adminPanel').classList.toggle('hidden',!isSuperAdmin(p));}
+async function saveMyName(){try{const name=$('myName').value.trim();if(!name)throw Error('Username is required.');await callAdmin('update_self',{name});currentProfile.name=name;showPortal(currentProfile);msg('profileMsg','Username updated in Supabase.');}catch(e){msg('profileMsg',e.message,true)}}
+async function saveMyPassword(){try{const a=$('myPass').value,b=$('myPassConfirm').value;if(a.length<8)throw Error('Use at least 8 characters.');if(a!==b)throw Error('Passwords do not match.');const {error}=await sb.auth.updateUser({password:a});if(error)throw error;$('myPass').value=$('myPassConfirm').value='';msg('passwordMsg','Password updated successfully.');}catch(e){msg('passwordMsg',e.message,true)}}
+async function loadUsers(){try{const r=await callAdmin('list_users');users=r.users||[];renderUsers();}catch(e){msg('adminMsg',e.message,true)}}
+function renderUsers(){const q=$('userSearch').value.trim().toLowerCase(),body=$('userRows');body.replaceChildren();for(const u of users.filter(x=>`${x.name||''} ${x.email||''}`.toLowerCase().includes(q))){const tr=document.createElement('tr');for(const val of [u.name,u.email,u.role,u.department]){const td=document.createElement('td');td.textContent=val||'—';tr.append(td)}const td=document.createElement('td'),btn=document.createElement('button');btn.className='secondary';btn.textContent='Manage';btn.onclick=()=>selectUser(u.id);td.append(btn);tr.append(td);body.append(tr)}}
+function selectUser(id){const u=users.find(x=>x.id===id);if(!u)return;selectedUserId=id;$('adminEditor').classList.remove('hidden');$('editEmail').value=u.email||'';$('editName').value=u.name||'';$('editRole').value=u.role||'User';$('editDept').value=u.department||'Operations';$('editPass').value=$('editPassConfirm').value='';msg('adminMsg','');}
+async function saveAdminProfile(){try{if(!selectedUserId)throw Error('Select a user.');const name=$('editName').value.trim();if(!name)throw Error('Username is required.');await callAdmin('update_user',{user_id:selectedUserId,name,role:$('editRole').value,department:$('editDept').value});msg('adminMsg','User details saved to Supabase.');await loadUsers();if(selectedUserId===currentProfile?.id){currentProfile=await getProfile((await sb.auth.getUser()).data.user);showPortal(currentProfile)}}catch(e){msg('adminMsg',e.message,true)}}
+async function adminResetPassword(){try{if(!selectedUserId)throw Error('Select a user.');const a=$('editPass').value,b=$('editPassConfirm').value;if(a.length<8)throw Error('Use at least 8 characters.');if(a!==b)throw Error('Passwords do not match.');if(!confirm('Reset password for '+$('editEmail').value+'?'))return;await callAdmin('reset_password',{user_id:selectedUserId,password:a});$('editPass').value=$('editPassConfirm').value='';msg('adminMsg','Password reset successfully. Share the temporary password securely.');}catch(e){msg('adminMsg',e.message,true)}}
 async function getProfile(user){
  const {data,error}=await sb.from('Profile').select('id,name,email,department,role,status').eq('id',user.id).single();
  if(error)throw error;if(data.status!=='Active')throw new Error('This account is inactive.');return data;
 }
 function showPortal(p){
  $('login').classList.add('hidden');$('portal').classList.remove('hidden');
- $('userInfo').textContent=`${p.name||p.email} · ${p.department||''} · ${p.role||''}`;
+ currentProfile=p;fillMyProfile(p);$('userInfo').textContent=`${p.name||p.email} · ${p.department||''} · ${p.role||''}`;
 }
 async function login(){
  const b=$('loginBtn');$('err').textContent='';b.disabled=true;b.textContent='Signing in...';
